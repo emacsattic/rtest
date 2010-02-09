@@ -1,0 +1,16 @@
+rtest is derived from Wayne Mesard's regress.el package, a few
+versions back.
+
+Even tho I wrote almost all of the code (98%+) in the current rtest
+package and redesigned it heavily, I believe this package owes a great
+debt to Wayne.
+
+If regress.el had been as ambitious as rtest is, it prolly never would
+have got off the ground.  But regress.el had a good idea, an idea so
+strong that it took on a life of its own.
+
+Every step of the way, I used regress.el or some direct descendant of
+it to check my work.
+
+So I want to thank Wayne and acknowledge that he started this project.
+

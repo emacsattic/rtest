@@ -1,0 +1,164 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-eval">
+    
+      `eval' doesn't take extra args, so this perhaps shouldn't?  Or
+      perhaps deval will simply have to be different.
+
+    
+  </Component>
+  <Component Name="rtest-dequote">
+    
+      NB, rtest-dequote is only when the args are evalled as being
+      part of the thing.  Constants are sometimes swallowed as args to
+      our own functions.  Whether they get evalled is controlled by
+      the functions that surround them.
+
+
+    
+  </Component>
+  <Component Name="rtest-defunction">
+    
+      Doesn't handle lambda forms yet.  It could test for a list-form,
+      try to eval it, and use it as the constant.
+
+    
+  </Component>
+  <Component Name="rtest-desymbol-value">
+    
+      We need this function for devalling symbols.  If it were not the
+      exact inverse of symbol-value, then we'd rename it and keep it
+      as is.
+
+      if X = (symbol-value A), then A = gensym, (setf (symbol-value
+      sym) X), sym ??  Yes, this is what we use for bindings to
+      symbols.
+
+    
+  </Component>
+  <Component Name="rtest-debq-do-cons">
+    
+      This could use a mapcarcaller like rtest-call-function.  We'd do
+      var accumulation there, and call from there.  Our worker
+      functions would have to take lists of walkers, but they're
+      easily disassembled.
+
+      But it's work for no real imporvement.
+
+    
+  </Component>
+  <Component Name="rtest-deval-top">
+    
+      
+      Should we append bound-syms/bound-vars instead?  
+
+      Should perhaps compute all evals earlier, in lexical scope?
+      That avoids all this trouble.  Then we'll need incoming symbols
+      to match against, and we'll need to output the forms they are to
+      be bound to.
+
+      If we do so, ISTM it'd be better to make a structure for the
+      entire return type... and bind it as we did for values?
+      
+      Rather than changing everything, it may make sense to group
+      pre-evalled vars together with post-tested vars.  How will we
+      distinguish them?  
+
+      A pre-evaluator could look like (form . VAR).  That's all.  It
+      would still be in the lets, and would turn into something like
+      (setq VAR form).  Since the gensym VAR that needs to be set is
+      second in either case, the leading setq could distinguish them.
+      But of course I'd prefer a real defstruct and types.
+
+      Doing that would affect *-destructure where it gathers the
+      unique symbols - it would just ignore this type.  That's easy.
+
+      So I'll build a defstruct for return types and see how it works.
+      The multiple-value-binds would turn into tehom-with-struct-slots
+      The -multi forms would have to change.
+
+    
+  </Component>
+  <Component Name="rtest-call-function">
+    rtest-call-function could pass more parms thru, taking a list of
+    them as its second arg.  That would requires some changes, but not
+    too much.
+
+  </Component>
+  <Component Name="rtest-sequence-alist">
+    This data could include the respective predicate-style walker
+    too.  That would be used for building the other type of walkers,
+    for predicate-style walking.
+  </Component>
+  <Component Name="rtest-debackquote-listish">
+    WATCH OUT!  CLISP has (SPLICE (UNQUOTE X)), which may not work
+    here.
+
+
+  </Component>
+  <Component Name="rtest-backquote-sym">
+    Will this work for Common Lisp?  Because is uses
+    eval-when-compile, which may not behave the same between Elisp and
+    CL.
+
+  </Component>
+  <Component Name="pattern-deignore">
+    This really exists because it conveniently makes walkers to match
+    nil.
+
+  </Component>
+  <Component Name="pattern-deval">
+    This could watch for circularity, and if found, react specially.
+    
+    Missing tests:
+
+           '( 
+	 (pattern-deval
+	   'A)
+
+	 :pattern
+	 '(t
+	   `((,#'pat-r-walkbind-bind ,G1) ((A . ,G1)))
+	   t))
+       
+       '( 
+	 (pattern-deval '(list A))
+	  :pattern
+	 '(t
+	   (pat-r-walkbind-list
+	    ((pat-r-walkbind-bind G67265)) nil)
+	   ((A . G67265)))
+
+	 )
+
+       '( 
+	 (pattern-deval '(list A))
+         ;;Unfinished
+	 )
+
+       ;;Goes OK now, but shows that backquote could reduce better.
+       '((pattern-deval
+	  '(list A 1 2 `("abc" B)))
+	 
+	 )
+
+       '(
+	 (pattern-deval '(list 2))
+
+	 :comparand
+	 ((pat-r-walkbind-list 
+	    ((pat-r-walkbind-match
+				  2))
+	    nil) nil)
+	 )
+
+  </Component>
+  <Component Name="pattern-find-uneval-function">
+    Doesn't try to handle lambdas yet.
+  </Component>
+  <Component Name="pattern-debq-do-cons">
+    Could use a mapper instead.
+  </Component>
+</Rambledocs>

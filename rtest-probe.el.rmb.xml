@@ -1,0 +1,30 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-calc-bindings">
+    For now, we assume bindings don't care about order and eval them
+    in parallel.  This is proper for a let form, but a let* form would
+    need to progressively accumulate bound values.
+
+  </Component>
+  <Component Name="rtest-calc-all-bindings">
+    For now, this assumes they are all independant let forms.
+  </Component>
+  <Component Name="rtest-one-probe-2">
+    destructuring-bind could instead set *bound-syms* and
+    *bound-vals*, which would disappear from intermediate arglists.
+
+  </Component>
+  <Component Name="rtest-build-call-with-arounds">
+    This is quite specific, but could be parameterized with actual
+    application (normal or (apply 'sym ...)), function called, and
+    number of args.
+
+  </Component>
+  <Component Name="rtest-get-clauses">
+    All this does is combine static and dynamic info.  Testing would
+    bind rtest-permanent-init-forms to a known form.
+
+  </Component>
+</Rambledocs>

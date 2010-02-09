@@ -1,0 +1,33 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-grade-by-comparand">
+    rtest-maybe-make-single-failure's object should be (result
+    grader), when we do multiple objects.
+  </Component>
+  <Component Name="rtest-grade-by-predicate">
+    Does not take notice of bindings, assumes exactly one arg.
+  </Component>
+  <Component Name="rtest-map-graders">
+    We'd like this to work for vectors too, but it doesn't.  We'd
+    change to `across result' and change the earlier test on result to
+    `sequencep'.  Graders must still be a list.
+
+  </Component>
+  <Component Name="rtest-grade-every">
+    We'd like this to work for vectors too.  As for rtest-map-graders,
+    use across, sequencep, etc.
+
+  </Component>
+  <Component Name="pattern-destr-build-call-to-grader">
+    Could check if there are any duplicate symbols and report if so.
+
+    We'd like to show the bound syms / vals too, when this
+    can show multiple objects and their symbols.  
+  </Component>
+  <Component Name="rtest-grader-func-alist-1">
+    Common Lisp requires the load-time work here, so don't change this
+    to a quoted list.
+  </Component>
+</Rambledocs>

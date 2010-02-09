@@ -1,0 +1,51 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+
+    Other possibilities for improvement.
+
+    Change the insertion tools to use skeletons, which is cleaner?
+    
+    Something to build the single tests interactively?  At least to
+    provide a completion list of the test keys?  A skeleton kind of
+    thing?  A widget/customization kind of thing?
+
+
+  </General-comments>
+  <Component Name="rtest-insert-suite">
+    This could possibly put the function's name on top of the kill
+    ring so it may easily be yanked.
+  </Component>
+  <Component Name="rtest-lisp-mode-alist">
+    rtest-lisp-mode-alist could use another entry to indicate a
+    single-sexp tester suitable for rtest-next-sexp, if we do it that
+    way.
+
+  </Component>
+  <Component Name="rtest-prompt-for-suites-aux">
+    Could switch to arrange-syms-other-window, but callers would have
+    to change too.
+  </Component>
+  <Component Name="rtest-call-site">
+    This is kind of obsolete.
+  </Component>
+  <Component Name="rtest-access-suite-name">
+    Boy did I want pattern-matching when I was writing this.  This was
+    written before the pattern functionality was.
+
+    This could return multiple names.  We'd use all or let the user pick
+    one.  But picking the first is sufficient.
+    
+    We don't support the old `put' syntax.
+
+    
+  </Component>
+  <Component Name="rtest-read-suite-name">
+    tehom-read-multiple collects multiple reads, if we ever want to
+    read multiple forms and test them.
+
+  </Component>
+  <Component Name="rtest-load-only-suites">
+    A version of this is needed for Common Lisp too.
+  </Component>
+</Rambledocs>

@@ -1,0 +1,52 @@
+Pattern is a pattern-matching facility for Lisp, similar to pattern
+matching in Prolog, Haskell, ML.
+
+The overall rule is that...
+
+     (pattern-bind pattern object pattern) 
+
+...equals...
+
+     object 
+
+Symbols match any object, and are bound as if by a `let' statement.
+Two occurences of the same symbol demand that the binders be equal.
+
+To evaluate a symbol normally, or a list-form that contains symbols,
+use (deval ...)
+
+Only a few functions are supported: ignore, quote, function,
+symbol-value, list, list*, vector, cons, append, the backquote macro,
+and make-* for any defstruct.  Also new functions optional and
+optional*.
+
+It's easy to enable other functions with pattern-set-devaller-special
+or pattern-set-devaller-normal.  Unfortunately, I don't have time to
+fully explain how.  Briefly, the function in question has to be
+reversible/lossless, and you write another function that builds a
+walker that reverses it.  The reverser function for `foo' is
+canonically named `rtest-defoo'.  Then you call
+pattern-set-devaller-special or pattern-set-devaller-normal, which
+magically sets the appropriate properties to make it go.
+
+For pattern-set-devaller-normal, your reverse function is given a list
+of walkers that pattern already figured out.  For
+pattern-set-devaller-special, you will have to figure the subsidiary
+walkers out yourself.
+
+Also see pattern-set-devaller-none, which specifically disables a
+function from being used in pattern-matching.
+
+======================
+
+Naming conventions:
+
+Everything that de-evaluates some function call is called rtest-de*.
+Everything that uses report-style is called pat-r-*
+Everything that uses predicate-style is called pat-p-*
+Everything that switches between them is called pattern-*-by-style
+Everything that is common to both is called pattern-*
+pattern-debq-* handles de-backquoting.
+
+
+======================

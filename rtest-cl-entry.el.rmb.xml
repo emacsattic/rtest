@@ -1,0 +1,13 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    This is an interface by which emacs can run regression tests in
+    an inferior Common Lisp.
+
+    Unfortunately its development was stymied by CLISP's severe
+    trouble with type predicates.
+  </General-comments>
+  <Component Name="rtest-nice-tables">
+    rtest-nice-tables is not yet transmitted to the inferior lisp
+  </Component>
+</Rambledocs>

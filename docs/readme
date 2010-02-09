@@ -1,0 +1,83 @@
+==========
+
+Systems:
+
+Rtest should work without change in Emacs-Lisp 
+
+It should mostly work in CLISP, but CLISP's weak typep has caused
+serious problems in the past.
+
+==========
+
+Installation:
+
+Elisp Installation:
+
+Untar the archive into a subdirectory of your site-lisp.  That's all.
+Autoloads and load-path will be set up automatically.
+
+You may want to byte-compile the .el files.  They should byte-compile
+error-free in any order in Elisp.
+
+==========
+
+What does regress.el do?
+
+It supports regression test suites in Elisp and Common Lisp.
+
+It reports results in an HTML report format that clearly indicates
+what failed and what the relevant data is.
+
+The test keywords (see keywords.txt) let you write powerful tests
+easily. 
+
+It traps errors and returns failure information instead.  This is very
+useful, because it lets the rest of your test suite keep going, and
+sometimes it's useful to test that a function throws an error under
+some circumstances.  regress-got-error lets you recognize an error
+without dealing with the details of what kind of error got thrown.
+The new let-deflias and let-defaliases let you do a different kind of
+whitebox testing, where you replace crucial functions with trivial
+variants (like list or identity) so you can test a function that calls
+other functions to do significant work, without dealing with those
+functions at the same time.
+
+==========
+
+Elisp major entry points:
+
+rtest-insert-suite will create a regression test skeleton for the
+function point is in or near.  Filling it in is up to you.
+
+rtest-defun will run the test suite, if any, for the function or test
+suite that point is in.  C-u rtest-defun will eval the function or
+suite, then run it.
+
+rtest-next-sexp will run the sexp after point as a single test-form.
+
+rtest-run-suites will prompt your for regression suites to run, then
+run them.
+
+==========
+
+Common Lisp major entry points:
+
+rtest-inferior-run-suites will prompt your for regression suites to
+run
+
+=========
+
+Q: What happened to version 2?  
+
+I was just about to release it, and I decided it "would be nice" to
+add some more features.  And the more I added, the more I realized
+that there was a much better package inside, waiting to get out.  Now
+it's out.
+
+=========
+
+Bugs:
+
+M-x rtest-submit-bug-report to submit bugs.
+
+=========

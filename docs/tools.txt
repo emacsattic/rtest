@@ -1,0 +1,16 @@
+=============
+In ancillary/safe-equal.el there is a variant of equal that is
+sometimes very useful.  `safe-equal' can compare circular structures,
+whereas ordinary `equal' goes into an infinite loop.
+
+============
+
+rtest-load-only-suites is useful for testing after you have compiled
+the file the tests are in.  Simply visit that file and call
+rtest-load-only-suites and the tests (and everything else inside
+eval-when-compile) will be loaded.
+
+Unfortunately Lisp offers no way to manage tets as such, so it has to
+be done manually.
+
+============

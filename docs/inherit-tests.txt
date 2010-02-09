@@ -1,0 +1,43 @@
+Inheriting tests
+
+Functions can inherit other functions' tests, but it's a bit difficult
+to write.  The basic forms are
+
+       (rtest
+	 rtest-inherit-raw
+	 :docstring "Docstring"
+	 :inherit-from  'symbol ;The function you are inheriting tests from
+	 :probe-builder 
+	 #'(lambda (...) ...)
+	 :own-clauses '()       ;Clauses to include in the inheriting test
+	 )
+
+and
+	
+       (rtest
+         rtest-inherit
+         inherit-from    ;The function you are inheriting tests from
+	 do-call         ;Function to translate one call to another.
+	 :find-probe   a ;Function to find the probe expression
+		         ;inside the original probe expression
+	 :alter-output b ;Function to the inheriting function's output
+		         ;to the original function's output
+	 :own-clauses  c ;Clauses to include in the inheriting test
+	 :docstring "Docstring"))
+
+If you are at all uncertain about how the functions connect, start
+with only :inherit-from and :do-call defined.  :do-call must always be
+defined to call the function inheriting the test.  Start with the
+function itself if you're unsure.  You'll see what's wrong pretty
+quickly.
+
+
+Then add :alter-output, and :find-probe if you need them.
+
+:own-clauses allows you to provide clauses to the inheriting test,
+(:let ...), (:around ...) and so forth.
+
+
+=============
+
+

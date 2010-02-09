@@ -1,0 +1,59 @@
+====================
+Grader keywords:
+
+The :test keyword lets you make an arbitrary test on a result.
+
+The :pattern keyword lets you test a result against a pattern.
+
+The :predicate keyword lets you use any predicate of 1 argument as a
+grader.
+
+The :every keyword lets you perform a test on each entry of a list
+result.  It is recursive.
+
+The :map keyword lets you map a list of tests across a list result.
+It is recursive.
+
+The :field keyword tests a specific field of a result, either by
+number (as for a list or vector) or by name (as for a structure) It is
+recursive.
+
+All the applicable grader keywords have variants that support multiple
+value returns, eg :test-multi, :predicate-multi, :pattern-multi.
+
+====================
+Non-grader keywords:
+
+:around forms
+
+`:around' forms surround the entire test.  
+
+NB, they are around *both* probe and grader.  Throws and signals will
+not propagate to the around form, rtest itself catches them.  If you
+intended an error to be caut around the probe, surround the probe
+itself, don't use an `:around' form
+
+They are a good place to bind special variables.
+
+==============
+
+:let forms
+
+Let forms evaluate their expressions only once, and make that value
+available separately to probe and graders.
+
+If you need to test something that modifies a value, use :around, not
+:let.
+
+
+=============
+
+:include forms
+
+Include forms let you include graders as if you wrote them directly in
+the test form.  Included material must be a list of (key data key data
+...)
+
+`:include' is useful for re-using  `:let' and `:around' forms.
+
+=============

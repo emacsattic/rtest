@@ -1,0 +1,20 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-fail-summary-p">
+    This doesn't work in CLISP because typep doesn't work properly in
+    CLISP.  We could use rtest-any-valid-return-p instead but that
+    doesn't work in Elisp.  So I bandaged it in rtest-lisp.lisp, but
+    the real fix is to use a better inferior Lisp.
+
+  </Component>
+  <Component Name="rtest-unflag-symbol">
+    Not quite an entry point, but usable.  rtest-entry.el and
+    rtest-cl-entry would manage this if it were to become frequently
+    used.
+
+    This can't have an interactive spec to acquire the symbol because
+    it services Common Lisp too.
+  </Component>
+</Rambledocs>

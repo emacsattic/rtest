@@ -1,0 +1,21 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    The failure report structures are lists, so we can pass them
+    between Elisp and Common Lisp, and they are named so that we can
+    tell them apart.  But now that we format the report before passing
+    it back, perhaps they needn't be lists any more.  This could
+    incidentally work around CLisp's typep problems.
+
+  </General-comments>
+  
+  <Component Name="rtest-nested-test-failures">
+    This could add something indicating list, vector/array, or
+    structure. 
+  </Component>
+  <Component Name="rtest-general-error">
+    :type could theoretically also use `nil' but that would mean no
+    error, which contradicts the fact that it's an error report.
+
+  </Component>
+</Rambledocs>

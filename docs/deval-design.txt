@@ -1,0 +1,1180 @@
+Design notes
+============
+
+Why I did things the way I did
+==============================
+
+This is largely me talking to myself during the design process, but
+you're welcome to listen in.  I've edited it a little for clarity and
+to remove ramble, but otherwise it's what I designed from.
+
+I believe design motivations are a somewhat important part of
+documentation that often gets overlooked.  Programmers hate to
+document, so they put if off, and then come up with a bloodless
+compendium of the functions and constants defined in the source.  That
+doesn't help a maintainer understand why things are the way they are.
+
+
+================
+Pattern-matching:
+
+Requirements:
+
+That both variables and constants be indicated.
+That the pattern form essentially resemble the input.
+
+
+=================================
+Approach: Use an existing package.
+
+I could only find select.cl
+
+At first it seemed good, but later experimentation showed that it
+couldn't actually do the job.
+
+
+We need constantp for it.  Looks like not much more than that.
+
+;;Sufficient to run trivial tests:
+	     (defalias 'constantp 'encap-atom-is-literal-p)
+	     (defconst T t "" )
+
+Problem is, select.cl dones't work.  It assumes if the apparent
+expression is atomic, the whole thing is, but it's not.  In fact,
+using select.cl will prolly be harder than just writing it.
+
+
+==
+
+How to indicate variables:
+
+I originally want to use backquote's comma syntax to indicate
+variables.  However, looking at select.cl made me realize that using
+an ordinary quote syntax for non-variables is just as good.
+
+Example:
+    
+    (1 b 3) 
+
+matches
+
+    (1 "x" 3)
+
+and binds `b' to "x".  
+    
+    ("x" b b)    
+
+matches
+
+    ("x" 1 1)
+
+and binds `b' to 1.  It doesn't	match 
+
+    ("x" 1 2)
+
+==
+
+We use `equal' to test matching, not `eq'.  `equal' compares symbols
+giving the the same results `eq' does, but unlike `equal', can compare
+values.  We may sometimes want to use safe-equal instead.
+
+=============
+
+It would be nice if we could walk vectors and structures as well.
+selective-equal provided some code for doing that.  
+
+The syntax we'd use for structures isn't clear, tho.  #S doesn't work
+in ELisp, and makes a structure in Common Lisp.  There'd have to be
+another symbol for that.  Perhaps use make-STRUCTURE, somehow
+recognizing it as special (function-quoting?) and split the structure
+by keywords.  That's nice because it generalizes to all sorts of
+functions.
+
+(Rejected) Also possibly desirable: symbols for multiple matching (ala
+select.cl's `=') and predication.  Not urgent, tho, and if one allows
+too much junk in the bind, it defeats the purpose.
+
+=============
+
+Approach:  Build something to feed to destructuring-bind.
+
+Our recurser can't use simple mapcar because the list mite have a dot
+in it.  So we use maplist instead.
+
+So what we want is:
+
+A destructuring-bind expression that uses entirely new symbols
+Tests that each non-quoted symbol was bound to a thing it equals.
+Tests that each quoted symbol that was bound to more than one thing
+      was bound the same each time (also using equal)
+Run user-defined tests with the original symbols bound.
+Handle &optional and &rest appropriately as simply being themselves.
+
+So
+
+(a 'b a)
+
+would translate to
+
+(destructuring-bind
+  (G1 G2 G3)
+  ARG
+
+  (and
+    (equal G1 G3)
+    (equal G2 b)
+    (funcall user-tests G1 G2 G3)))
+
+It wants to return:
+The new destructure object
+The collected variables with their bindings
+The collected equalities.
+
+
+So '(1 a 'b) would give 3 values:
+   (G23 G24 G25) ;
+   ((a G24)) ;
+   ((1 G23) ((symbol-value b) G25))
+
+
+So walk the destructure, and for every atom, add to a list of
+(orig-sym . new-sym).  Literals may add to a different list or
+distinguish themselves.
+
+Build a new destructuring-bind object of the same shape.
+
+Combine duplicates, so each orig-sym has a list of new syms.
+
+For those symbols that are literal, construct tests with the new
+symbol's binding.
+
+For those symbols that have multiple bindings, test among those
+bindings.
+
+Then construct a call to user-tests, if it's not nil, with the symbols
+bound.  
+
+Put it all together.  If destructuring-bind has an error, the test
+failed. 
+
+=============
+
+
+Approach: Or it could possibly construct the tests in place, in effect
+skipping destructuring-bind and compiling the expression.  IE, doing
+destructuring-bind's coding work all over again.
+
+So 
+   '(1 a) 
+
+would give
+
+(if
+  (and
+    (equal (nth 0 obj) 1))
+  (progn
+    (setq G23 (nth 1 obj))
+    t)
+  nil)
+
+The variables would still have to be returned, 
+
+
+=============
+
+Approach: just try to unify the expression with it.  But we still have
+to walk it to find the variables.
+
+I'd have to rewrite unify in Elisp (but then we'd have it), and I'd
+still have to bind the things for the tests.  And most importantly, I
+couldn't use that nice syntax I want.  Or I'd still have to walk the
+tree to get the variables' names.
+
+And the pattern-case thing doesn't work properly.  Building
+pattern-case was easier than this, but never fully recognized
+variables as variables, didn't support rest, etc.  Better to use
+destructuring-bind underneath it.  Walking it independently mite be
+more efficient, but more complex to write.
+
+And of course, what's nagging me is that unify is bilateral, allowing
+outside variables as well as internal ones.  We want a unilateral one,
+where the incoming object is constant.  And we want the variables to
+be in effect specified by the pattern, not separately. 
+
+==
+
+Approach:  Write a variant one-sided unify.  Nah.
+
+==
+
+Approach: Instead of re-using destructuring-bind and catching its
+errors, I could do destructuring-bind's work.
+
+I prefer this because I'd like it to be extensible to vectors, etc, as
+destructuring-bind isn't.
+
+So instead of constructing a tree, we construct an expression to be
+evaluated to assign to the symbols.
+
+It's tempting to prematurely optimize it by figuring out which exact
+caadar/cdadar/etc expression to use to access stuff.  But I'm going to
+proceed in a cleaner, more functional way.  I'm going to construct a
+tree that mirrors the pattern.  Its nodes will be something like
+(function . data), where the function will be called, with some part
+of the input object as its first arg, upon the data.  The data will
+include the symbol to assign to or further nodes of the tree, as
+appropriate to the tree structure.
+
+How exactly do we indicate if the structure didn't conform to the
+pattern?  Throwing an error is easiest.  We'll catch that error
+outside here.
+
+We still test equality outside.  The tests could be moved inside that
+patterns, to throw errors on mismatch, similar to the way pattern
+does.  Eh, that actually seems cleaner, so we'll do it.
+
+====
+What type of error objects should it throw?  rtest reports.  That
+doesn't work very well for cons cells, tho, which map unevenly to
+lists.
+
+Or throw something we can build rtest reports from?  Perhaps throw
+(number . report ) down the list, until something above the first
+cons-handler catches it?
+
+(Chosen) BUT, because that or nil is the only return value, we will
+simply return them, as graders do.  Symbol-binding is a side-effect
+and needs no return value.
+
+====
+
+What counts as a constant?
+
+A quoted variable, which uses its direct value.
+A symbol that evaluates to itself.  This makes t, nil, and all the
+:field specifiers constant, as they properly should be.
+
+====
+
+Are symbols that should be constants evaluated at compile-time or
+run-time?  compile-time is easiest, but seems to have little
+functionality.  Perhaps they'd better be evaluated, with outside
+bindings passed down, at run-time.
+
+====
+
+So walk the destructure:
+
+Build a walk-and-bind function-object of the same shape
+
+      For those atoms or pieces that are constants, construct tests in
+      place.
+
+      For atoms that are variables, add a function-object to bind the
+      symbols passed down, and add to a list of (orig-sym . new-sym).
+
+Also return a list of (orig-sym . new-sym).
+
+Combine duplicates, so each orig-sym has a list of new syms.
+
+For those symbols that have multiple bindings, test that those
+bindings are equal.
+
+Then construct a call to user-tests, if it's not nil, with the symbols
+bound.  
+
+Put it all together.  If our walk-and-bind call throws an error, the
+test failed.
+
+It would look something like, minus error-catching and with a general
+  body: 
+  `(progv ,the-symbols (funcall ,the-walk-and-bind ,object) 
+  (if
+    ,the-equality-tests
+    (progn ,@body)
+    (make-rtest-...  ... )))
+    
+
+========
+Issue:  graders in patterns
+
+We don't use any grader as such.  rtest-grade-by-test is closest, but
+it expects to be dealing with a result.  We may want something to
+encap lambda-building so we already do the eval thing that keeps us
+compatible with Common Lisp
+
+As for bound-syms and bound-vals, they must be added to the other
+bindings.  (And they still may be used for rtest-pattern-bind-aux-1)
+That will be done before we get to rtest-grade-by-pattern-aux-2.  We
+may generate them as 2 lists anyways, and zip them up later.  They are
+logically equivalent ways.
+
+We'd like the predicate to be figured out before we get here, still in
+the macro.
+
+
+===========================
+
+Issue: How exactly should patterns for functional (de)constructors
+look?
+
+Regardless how it looks, it will mean: treat the following in a
+special way, as if it were composing the part of the pattern that we
+are interpreting.  
+
+That's the general rule for patterns: Make the pattern look as if it
+were construction, not decomposition.  Variables that look like
+parameters in construction that need to be bound become bound after
+the pattern-bind is done.  Literals are "in the middle", not bound in
+either case.  We'll try to follow it exactly in this case as well.
+
+Possible forms:
+
+This looks nicer but is ambiguous.  It could mean, that literal
+function followed by the pattern that follows it. 
+
+     (#'make-tehom-se-rtest :my-field '(A B C))
+     =
+     ((function make-tehom-se-rtest) :my-field (quote (A B C)))
+
+This is less ambiguous, but still semantically implies that the form
+is used as a literal, not as destructuring.  A list is not a function
+literal, but could return one.  However, if that was it the form
+could simply be single-quoted, couldn't it?
+
+     #'(make-tehom-se-rtest :my-field '(A B C))
+     =
+     (function (make-tehom-se-rtest :my-field (quote (A B C))))
+
+How about simply recognizing ctors and treating them specially?  Which
+means recognizing all functions, whose symbols could also have values,
+so that's ambiguous.
+
+So again, functions have to be recognized as special if they are to be
+used in this way.  And as before, this is all interpreted as if one
+level of quoting had been removed, with unquoted symbols being
+variables.  
+
+So quoted forms are evaluated anyways, but it's not clear how that
+naturally applies to function-quoted forms.  They're certainly not
+just evaluated, because quote does that.  Nor does it mean to use
+their function-values as literals, because that can be accomplished by
+"'#'foo"
+
+So ISTM it is reasonable to assign a new meaning to #', something to
+do with functions as opposed to variables, and something eval-ish.
+However, it isn't clear what a atom would even mean in that case.  It
+certainly shouldn't introduce bindings, because we can't see any
+symbols.  
+
+EG, say we have something like:
+
+    (rtest-destructuring-bind #'foo object ... )
+    
+If foo needn't be bound, it would constradict the way quote is
+treated, and what would be the point of treating #'foo any different
+than a free variable?
+
+So now we know we must have something of the form:
+
+    (setq foo ... )
+    (rtest-destructuring-bind #'foo object ... )
+
+It can't bind foo to anything, because it's already bound.  So perhaps
+it uses foo as a predicate, not a literal.  So in general it must take
+a single arg, the object.  Perhaps it's different after &rest?
+
+It seems to make sense.  That's something like what select.cl did with
+it, so there's a little confirmation, tho I don't put too much faith
+in select's choices because many of them were against Lisp syntax.
+
+So now suppose we have an expression like:
+
+   (setq foo ... )
+   (rtest-destructuring-bind #'(foo A B) object ... )
+
+foo itself would have been a predicate.  Does evaluating the whole
+form give us a predicate?  Sure it could, and would take all the
+apparent parms as parms.
+
+So this pretty much rules out #' for deconstruction of structures, and
+also disallows select.cl-style predicates-slash-bindings.  Never the
+twain shall meet.  However, NB by allowing predicates we allow any
+variety of rtest test to be used inside here - not that it's a big
+deal or even neccessarily a good thing.
+
+So how do we indicate that a form is to be interpreted as
+destructuring something?  Perhaps by adding abother level of
+quote-ness.  EG:
+
+    (rtest-destructuring-bind '(1 2) object ... )
+
+means the same as:
+
+    (rtest-destructuring-bind (list 1 2) object ... )
+
+So to destructure a structure, we'd use something like:
+
+    (rtest-destructuring-bind (make-my-thing :my-field A) object ... )
+   
+which would mean that the object in question must be a my-thing and
+A will be bound to the value of its my-field.
+   
+So forms that were unquoted now become quoted.  This lets backquote
+nicely into the game too.  We can't support a lot of forms, but all
+ctors can be handled by noticing "^make-" and the few forms we
+frequently use like `list' and `cons' are fine.
+
+One apparent issue is that the new style prevents us from building
+forms symbolically instead of literally.  But that's a non-issue.
+We're binding symbols here, so they have to be lexically present.  As
+always, destructuring is ideally an exact reverse of constructing,
+with calls and so forth.
+
+A more crucial issue is whether we can still express the old forms
+concisely.  IE, does
+
+    (rtest-destructuring-bind '(A 2) object ... )
+
+bind A to the car of object?  It seems wrong now, as if it wants to
+test against the literal value of A as it comes in.  Which is another
+piece of functionality we pick up.  But now we must express binding A
+to the car as:
+
+    (rtest-destructuring-bind (list A 2) object ... )
+
+Which is to say, now that heads have escaped quotedness, so has
+everything else and our syntax just got quite a bit more verbose.
+However, there's help from our old friend backquote:
+
+    (rtest-destructuring-bind `(,A 2) object ... )
+
+is the same as
+
+    (rtest-destructuring-bind (list A 2) object ... )
+
+and is sufficiently concise, while 
+
+    (rtest-destructuring-bind `(A 2) object ... )
+
+is the same as
+
+    (rtest-destructuring-bind (list 'A 2) object ... )
+
+which is the same as
+
+    (rtest-destructuring-bind '(A 2) object ... )
+
+So my original instinct was rite:  Pattern-syntax should be related to
+backquote syntax.
+
+So this seems like a promising, powerful and clean avenue to explore.
+It means changing some of the code drastically, but the payoff is
+good.  We will still walk destructuring the same way, the only thing
+changed is building the walker.
+
+Handling backquote is a task, tho.  For one thing, even reading in the
+backquote symbol is tricky.  However, once we've got that, the rest is
+symbols that should pose no special problem.  Note that:
+
+(defmacro look-at-backquoted-form (form)
+  ""
+
+  `',form)
+
+(look-at-backquoted-form `(,A 2))
+=>
+(\` ((\, A) 2))
+
+
+Another problem is that walking and pseudo-executing code is not like
+walking a structure.  We have to deal with heads, each of which is a
+different call.  That's kind of a PITA.  We have to undo backquote
+syntax too.
+
+Another approach to handling structures, which could save us all this
+ambitious work, is to say that when a structure is recognized, it's
+traversed and any of its pieces are symbols, they get bound.  IE, walk
+it as a struct, even if it's symbolic.  That doesn't work, tho,
+because we shouldn't distinguish between symbols that are/aren't bound
+outside.
+
+	  (pattern-bind s (make-my-struct :field-1 'A :field-2 11) 
+	    (make-my-struct :field-1 134 :field-2 11))
+	  ;;A is bound to 134, and field-2 had to be 11.
+
+One thing that's weird about the quoting, under this interpretation,
+is that (funcall #'foo arg1 arg2) should act mostly normal - use the
+quoted function.  And what would an lambda-form do?  Is it treated as
+a direct function, or do we somehow try to invert it?  Run it
+backwards or something, to finally bind the given args?  
+
+(funcall
+  #'(lambda (A B) ... )
+  arg1 arg2)
+
+
+===========================
+Further design of the destructurer, now called deval:
+
+
+Do quotes still mean to evaluate?  If so, with what bindings is the
+expression evaluated?  pattern-run-time?  pattern-compile-time?  Only
+pattern-run-time makes sense.  And since it's strait comparisons,
+evaluations are fine.  It doesn't break the symmetry if it evals to
+the same constant each time... except that afterwards it doesn't *get*
+evaluated.  So we need an escape function, or a toggle function.
+Pattern-bind itself?  IE, the top-level walker function would be
+aliased, here, to evaluate an object?  So:
+
+	 '(setq C 1 D 100)
+	 '(A B (deval (+ C D)))
+
+behaves like:
+	  
+	 '(A B 101)
+
+Problem is with the signature.  What we need takes *one* expression
+and returns it evaluated.  deval creates a walker for that pattern?
+Or uses the walker?  In any case, it's like a setq... so there's our
+symmetry.  (deval (deval pattern)) should change nothing.  It sets
+the same symbols it originally took.  So deval, in its forward form,
+behaves how?  Like a setq?
+
+	'(deval (+ A 5)) 
+
+sets A to what?  Creates a walker, where its opposite creates a
+value?  That makes sense.  So if deval appears in an ordinary
+expression, it makes a walker?  
+
+	    '(list B (deval (+ A 5)))
+
+Ordinarily makes '(B <some-walker>), and devalled makes '(B
+<some-value>).  Yeah, it does seem kind of symmetrical.  Ordinarily
+its symbols "reference downwards" unlike the other symbols.  But
+devalled, its symbols "reference upwards" unlike the other symbols.
+
+Now I'm not sure that a walker is exactly the rite idea, but it's
+close.  Devalled, the expression becomes a value in a walker, and that
+walker can be used many times, applied as a pattern to values.
+Evalled, the expression becomes a walker in a value, and that value
+can be used many times, applied as a matcher to values.  So ISTM it's
+quite symmetrical.
+
+It preserves the symmetry, but it's verbose.  Could we add another
+thing to backquote to do that?  It would involve rearranging symbol
+names.  Not a good idea at this point.  If deval really takes off, I
+could add it.
+
+
+===========================
+
+Issue:  Plan for the new destructurer:
+
+For now, we don't allow macros or special forms, and don't even think
+about including anything that looks like it should have side-effects
+(eg setq) or enclose body forms (eg let)
+
+We deal with head-atoms and non-head atoms differently.  
+
+Non-head atoms are either literals to be matched or symbols to be
+bound.  Quoted forms are treated as literals.
+
+Head-atoms are examined to find a destructuring function.  How?
+First, look for a property, rtest-destructurer.  Failing that, look at
+their symbol-name for "^make-".  Failing that, fail.
+
+What then?  That function is called with the remainder of the list.
+In the case of make-, it's called with the type symbol as well.
+
+I'll demonstrate it on (cons constants...) first, then (cons
+variables...).  Then similarly for (list).  Then for structures.  Then
+we'll see how vectors etc fit in.
+
+
+===========================
+How arg lists could be expressed deval-style:
+
+
+'( A &optional B)
+;;equals
+'(list* A (rtest-optional B))
+'`(A . ,(rtest-optional B))
+
+
+'(A &optional B C &rest D)
+;;equals:
+'(list* A (rtest-optional* B C D))
+'`(A . ,(rtest-optional* B C D))
+'`(A . ,`(rtest-optional B C . D)) ;;Unsupported but would be nice.
+'`(A ,@`(rtest-optional B C ,@D)) ;;Unsupported but would be nice.
+
+Now, that's all a bit messy because it's so verbose, and it's so
+verbose because it's not already standard.  Re-using the &optional
+symbol to mean `rtest-optional' would help:
+
+'`(A ,@`(,&optional B C ,@D)) 
+
+Even nicer would be extending the backquote syntax with a symbol that
+meant "splice it in as an rtest-optional list".  There's little point
+in a non-splicing optional, because optionals can't be followed by
+non-optional args.
+
+'`(A ,?(B C ,@D)) 
+
+We don't handle "&keys" for the moment, and prolly won't bother with &aux.
+
+===========================
+
+Design decision for pattern-binding:
+
+I haven't fully considered the various decisions:
+
+Let vs lambda?  Take object as macro arg vs build lambda call that
+takes object?  (Chosen)  Both, by switch.
+
+Dealing with bound syms?  Included in grader, finally included
+in the matcher functions.  To do this in the future, they'd have to
+be passed as additional args to each branch of the tree, and match
+would have to use them to eval the comparand at runtime.
+
+How to use it in an rtest clause.
+
+How to use it in a cond statement.  Undecided.  Macroifying it all
+and lambdaizing it all seem at odds, but it prolly won't be that
+severe.  At worst, we'll build a different sort of form.  (Done)
+
+Throw errors or return errors?  Has to throw in general use, but not
+in rtest.  We will have 2 different styles here: report-style and
+predicate-style.  Report-style reports every error it could find.
+predicate-style reports nothing, just nil if it failed, t if it
+succeeded.  if X is report-style, (not X) is predicate-style.
+
+Figure out verbose errors in the equality-tests (knowing values and
+symbol), or throw a general bad-compare error?  (Let it slide unless
+it gives problems).  However, that's inconsistent with our treatment
+of mismatches while walking, which collects all the errors.  So
+again, we do it 2 ways.
+
+
+===================================
+How exactly to build pattern-bind:
+
+
+We'll want a gensym to stand for obj.  It must be evaluated exactly
+once, so it needs a let.  
+
+We have to destructure the thing first, then make a test, then use
+that test in a cond, and only then enact the body.  Seems impossible
+to straiten out in a cond-type statement.
+
+A list of nested `if's?  But how do we undo symbols we bound?
+
+A list of non-nested `if's each of which is skipped if some previous
+if succeeded.  Returning the value becomes complicated then.
+
+
+(Chosen) A list of separate ifs that throw when they succeed?  That
+seems the only way to do it lexically, and seems more linear than
+doing otherwise.  Also, we need merely change the call to be
+surrounded by a throw, and the overall form to include a catch and
+to put `nil' after all very clause has missed.  However, can we
+throw multiple values?  If not, multiple values get lost.
+
+A while loop is OOTQ because the forms become non-lexical.
+
+
+Can I do that as a macro, or is some form of loop required?  In any
+case, a list that executed the first matching element like that would
+be nice... but then it wouldn't be able to bind its stuff.
+
+
+=================
+Deval:  demapcar
+
+
+A demapcar could be useful.  Let's see what it would do:
+
+  (mapcar #'list '(1 2)) 
+
+would match only '((1) (2))
+
+That's the same as the result of applying unlist to each element.
+Obviously we can't use functions that can't be unevalled, and as
+always, side-effects aren't OK.  And obviously we'd have to know
+that the argument was a list.  If we have
+
+  (mapcar #'list A) 
+
+then we'd be matching a list of lists, collecting their first
+element, and A would be a list of those.  That's harder to do,
+because we have to assign to A at an inner node, not a leaf.
+Similarly for literals, eg (mapcar #'list (deval A)), and A would
+have to be checked for being a literal at runtime.  So the deal with
+mapcar and friends is just that we'd sometimes have to match inner
+nodes, IE, ct the thing in place.  That is, we'd have to make a
+bunch of symbols, 1 per walker, and create a list from 'em when
+they'd all walked.  And we couldn't easily do optimizations, because
+we mite be cting a list that was part literal, part evaluated, part
+symbol, eg:
+
+  (mapcar #'list (list* A 1 2 A (deval C)))
+
+NB, this example suggests that deval produces something with more
+structure, that under eval can sometimes be treated as a list
+
+Another tricky one is:
+
+  (mapcar #'(lambda(x) A ) some-list)
+
+We must match A to every element.
+$$
+
+==============================
+Deval:  backquote
+
+What backquote turns into, underneath the hood, before any
+processing happens:
+
+'`(A ,B)
+(\` (A (\, B)))
+
+'`(A B)
+(\` (A B))
+
+'`(A ,B ,C)
+(\` (A (\, B) (\, C)))
+
+'`(A ,@(B . C))
+(\` (A (\,@ (B . C))))
+
+'`(A ,B ,C D)
+(\` (A (\, B) (\, C) D))
+
+'`(A ,B ,@C D)
+(\` (A (\, B) (\,@ C) D))
+
+`(A ,@[1 2])
+(A . [1 2])
+
+Look at each part.  If it stands alone, include it.  If it starts with
+\, traverse it with normal unevaluation.  If it starts with \,@
+traverse it and splice it in... IE, undo all the cons thingies.  It
+better end in nil, or we can't do it.
+
+Where can splices not go?  Well, if they have a determinate number
+of elements, they can go anywhere.  Splices that are symbols are the
+same for this purpose as splices that end in dotted pairs - they are
+all list*s.  Dotted-pair splices may only go at the end of a list or
+a vector.  Doesn't matter whether it's dotted.
+
+
+Similar to -list-worker, but unlike that, we explore with
+rtest-debackquote 
+
+If we explore it backwards, then all we have to do is make sure
+splices append - tie on to the nil tail - rather than not doing so.
+
+And anything that needs no final nil, be it from list or list*, is
+OK. 
+
+
+
+Splicedness is encoded by pseudo-walkers
+(#'rtest-walkbind-splicing-list, which always throws an error),
+because it only makes sense for some walkers...  Non-list objects
+spliced in are walked as list*s with only 1 element, the last one.
+List objects spliced in become spliced-list, which is re-stitched.
+
+
+
+=============================
+
+Deval:  function (ie, #' )
+
+It just gets the symbol-value, and either matches against that or uses
+it.  Hmm, like quoting a symbol, what it really has is a symbol.  But
+when we walk it, we test what against it?  Suppose we receive a lambda
+form that matches that symbol's value.  Then it matches?  Can we
+figure out symbol-value now, in parallel to using quoted objects?  No,
+because quoted objects just skip the eval stage of a call, whereas
+function gets a symbol's function without calling it.  So we do need a
+special function to handle `function', it can't just expect to act
+like quote.  But it does use rtest-dequote underneath itself.  Both of
+'em need just 1 arg, anything else is an error.
+
+==============================
+Deval:  Devaluating macros:
+
+Macros may prolly be called literally and their result devalled,
+because their args aren't evalled first.
+
+I haven't tested a proof-of-concept for that yet, nor supported it.
+
+===============================
+Deval:  De-deval == eval.
+
+bound syms and vals are basically an environment that deval takes.
+That would fit nicely ISTM.  And it seems to mirror eval's use of an
+optional environment, which I should look up for more exactness.
+(That could be useful for the rtest graders s well)
+
+rtest-eval (de-deval) is for comparisons whose comparand should get
+evaluated when it's matched to.  It must take bindings from outside,
+because it can't lexically access much of anything.
+
+The bindings provide an environment.  If OTOH we said the
+environment should be passed specially, what would it pass?  But
+OT1H, how does an ordinary grader expression pass its bindings where
+it evals without extra effort?  We could always let them be special,
+and append anything specifically added here.
+
+=================================
+
+Naming conventions:
+
+Everything that de-evaluates some object, including a function call is
+called rtest-de*.  
+
+Every walker that uses report-style is called rtest-*
+Every walker that uses predicate-style is called ptest-*
+Everything that switches between them is called rtest-*-by-style
+Maybe walkbind should be used for every non-inner walker?
+
+=================================
+
+How would deval handle (VAR INITFORM SVAR), etc?
+
+It doesn't seem to me that putting that construction in a list or an
+optional list should have a special meaning, because that conflicts
+with other meanings.
+
+We could use logical operators, but they'd be very restricted.  So
+restricted that ISTM it's wrong to use them.
+
+ISTM it's better to have a "magic" type for that that will be
+recognized and treated specially.  
+
+When walkbinded, it will behave like (VAR INITFORM SVAR) would.  VAR
+must be a walker, SVAR a symbol (it can only be boolean), INITFORM
+must be literal or evalled, ie, it's implicitly in a rtest-deval.
+
+It isn't clear how this should behave normally.  Seems like it's best
+controlled by SVAR, which makes it an "if" statement.  Alternatively,
+it could be controlled by the presence of VAR, and give errors if SVAR
+doesn't agree.
+
+But remember, it also has one walker and one value.  so if SVAR is
+non-nil, it would walk VAR otherwise it would use VAR.  If it walked
+VAR, then what?  It doesn't produce a value for that, but it does
+produce an error if the walker doesn't match?
+
+Or better, just forget them because they can be assigned later.  What
+would be nice is if we could assign 'em more succinctly.  That would
+be good in general good because Lisp would no longer need BOA lists,
+which have intrusive dependencies.  The problem with that thinking is
+that if we're really thinking deval style, `defaultq' or
+`let-defaults' is a kind of deval, so we need defaultness anyways.
+
+Of course, ITC we have to understand that there's a whole section
+that's about providing the various alternate interfaces.  That section
+could also handle info like which sets of keywords are required.  But
+defaults are the only proper functionality that moves into there,
+because it's easy to see order of dependency when it's laid out
+properly.
+
+Another way to think about this is that we are defining a class of
+interfaces, and logic, `or' `and' etc may properly be there.  Not
+devalled because then the "narrow part is pointing in the wrong
+direction", not evalled because then we're figuring out the wrong
+thing, but something in between, like a forwards `or' inside the deval
+itself.  But it doesn't handle defaults.  And it poses a problem in
+that some symbols may not get defined.  So we'd simply be abusing the
+meanings of `and', `or', etc.
+
+Keys belong only in a keyed-list, where singleton symbols are both the
+variable name and the key name, but some other structure can
+distinguish key name from variable name.
+
+These structures should have a slot for documentation as well, which
+IMO is important for parameters.
+
+These structures should have a slot for interactive spec as well.
+
+Can they handle the sort of switching defgeneric/defmethod want?  If
+given the ability to add further constraints.  Which seems easy:
+re-use `the', which just validates type.  And once that's in, we mite
+as well add X where X is to `the' as `assert' is to `check-type'.
+
+However, more generally we may re-use rtest clauses: (the T V) ==
+(guarded V :type T), and so forth.  It's like an assert that
+participates in object construction.  Since it just produces an error
+when things don't work, it is bidirectional.  It already exists as
+`rtest-assert'.  However, rtest-assert has a slitely different
+signature, so we must decided on signature and name.
+
+====
+Issue: Multiple references to the same thing
+
+Sometimes it's convenient to have multiple references to the same
+thing.  
+
+assert could kind of do it, but can't participate in construction.
+ISTM `guarded'/`rtest-assert', described above, could do it with
+`:comparand'.  It shouldn't try too hard to get `:test' going, because
+that's just an abbreviation.  :pattern will be funny, :field will be
+repetitive.  Perhaps rtest and deval could share the parts that make
+;field, :map, and :every work.
+
+
+====
+Issue:  What deval produces when standing alone
+
+What exactly does it mean for the object being matched to have
+variables?  If it were cted as a walker itself, eg in an
+`optional-var' or `key' thing, and was waiting to be used as a test or
+something. 
+
+In that case, it still consists of an equivalence-list and a walker.
+So contrary to what I believed before, what a deval produces is
+(walker equal-list)
+
+====
+
+Can setf methods help with deval, because they "reverse" accesses?
+
+Perhaps, if we understand it as working only for functions that in
+reverse would put some possibly global value like (current-buffer)
+into the output object.  
+
+But such methods can't neccessarily create whole objects.  Consider
+devalling (car X).  If X is a constant, fine, but in that case we can
+use it directly.  And if it's not, we have a cell whose cdr is
+unknown.  Can't do much with that.
+
+We could say that it's only OK when we're doing pattern-setq and
+relatives.  Then we need to type walkers.  Sometimes this type info is
+wrong when we actually are cting a whole object, but ISTM it's always
+possible to ct the object anyways.
+
+
+=======================================
+Issue:  Skipping past annotations
+
+Annotations are something I designed to help make Lisp comments
+manageable.  (annotate X) is exactly the same as X, except for
+purposes of code-rewriting, which can then access commentary, etc.
+
+It's also like allowing docstrings anywhere at all, and I hope at some
+point docstrings will be a form of `annotate'
+
+It should be optional.  Normal walking should always be possible.
+
+rtest-apply-walker would recognize `annotate' and skip past it.
+There'd be a special walker that didn't skip annotate, that was
+stipulated by whatever devals `annotate'.
+
+
+=======================================
+Issue:  Two-way patterns (unification)
+
+Walkers are kind of like unifiable objects, eg what Prolog has.  IE,
+when one walks aother, they both try to unify.
+
+To do that with reasonable simplicity, we'd have to have some outside
+thing that walked both walkers, and they'd both have to be in
+canonical form, ie, list*s last parts must not be lists.
+
+In other words, our "walker" really just represents the object in
+canonical pure-list form, and we interpret the heads to walk the given
+object.
+
+This makes walkers a kind of "magic" type, to be recognized by other
+walkers.  For many purposes they cannot be accepted as values, but
+that just means the basic functions reject them.
+
+====
+Issue:  Walker Representation
+
+Because of how two-way patterns work, ISTM heads mustn't directly be
+functions.  They are just handled in too many ways.
+
+So we could change the heads' meanings in several ways: 
+
+   to walk report-style vs predicate-style, 
+   to skip annotations (except special ones)
+   to match one-way vs unify two-way.
+
+So basically, it would be better for the head to be a symbol, and to
+assign a function to those symbols around the walker.  This has little
+cost in efficiency, since they can still be compiled and they are
+`apply'd anyways.
+
+Implementation: Can we depend on knowing all those symbols and setting
+their values?  If we were after extreme efficiency we would, but we're
+not, and it's messy.
+
+Can we interpret each head as a symbol?  Yes, it just takes an extra
+step.  And they need to be special variables in Common Lisp or else
+their values won't be seen.  Chosen.
+
+====
+Issue: Variables in two-way matches.
+
+Now, when Prolog or a feature-unifier do two-way matching with
+variables, they are not just "making bindings after the match is
+done", they are finding a unified pattern which matches both, if
+possible.
+
+So the two-way matching should compose a form which is the product of
+both.  It itself shouldn't attempt to make bindings.
+
+====
+Issue: Variables in two-way matches.
+
+
+With one-way matching, there's no issue wrt what happens when two
+variables meet:  They never do.
+
+With two-way matching with ordinary variables, ISTM it's only an issue
+ 
+
+   if two different constants collide, it's an error.  (same as
+   normal)
+
+   if two variables hit each other, they must then be made to match.
+   IE, their equal-lists are combined.
+
+====
+Issue:  Applying walkers in 2-way walks
+
+Actually, we don't have to apply them.  We can just combine them: the
+walkers themselves combine under pattern-walkbind-every, the
+equal-lists just combine.
+
+ISTM the only reason we'd walk them is for efficiency: to find
+failures early, to combine branches that examine the same thing, list-
+and vector-accessors should combine with ordered-accessors like
+list/mapcar/etc.
+
+Combining always returns a new walker, possibly being the pseudowalker
+`pattern-walkbind-fail' that indicates that they can't be bound.
+
+====
+Issue:  Arithmetic
+
+Even some minor forms of arithmetic are theoretically possible.  EG,
+     (+ 2 A) 
+
+could translate into, where A' and A'' are placeholders 
+
+      bind A'' to the object
+      ;;...after walking is done
+      (setq A' (- A'' 2))
+      ;;...then compare, using A'
+      ;;Then assign A' or something equal to it to the real A.
+
+However, this is very restricted.  Can't do two variables at once,
+multiplication (ie, really divide) has to add a condition that the
+symbol not be zero, etc.  
+
+Using the same variable twice is sometimes solvable, but gets us into
+the area of real math work, which should be left to a real math
+package.  And even so, we can't make real equations in general, ie
+solving quintics.
+
+So the default arithmetic defunctions fail if they see two variable
+parts, but a real math package can replace them with smarter ones.  
+
+So now we have to distinguish between matchers created in the
+different ways.  This is a type issue, and they should all be subtypes
+of the class of all matchers.
+
+====
+Issue: Parsing
+
+In theory it's sometimes possible to satisfy `(,@A x y z) even tho A
+is unterminated.  This becomes real parsing, and requires look-ahead.
+
+Similar to the math approach, a smart parsing package could provide
+deval functions that are smart enuff to do this, but the default
+doesn't.
+
+
+====
+
+General differences between rtest and ptest:
+
+The `fail' object, which should have a message in case it's a report.
+
+The `succeed' object
+
+Whether loop says `collect' or `always'
+
+Whether we combine results with `and' or
+rtest-maybe-make-rtest-nested-test-failures with (list) around each.
+That would require really letting pat-r-walkbind-map and
+pat-r-walkbind-to-nils themselves make nested failures.  Which is
+cleaner anyways.
+
+The shortness of this list suggests that one file could generate
+both, and suggests that *maybe* the other walkers, such as 2-way,
+may accomodate this.
+
+====
+Issue: Binding the same object in more than 1 way
+
+One approach is simply to name the entire object, then bind it more
+than once.  pattern-setq will do this.
+
+But this is unsatisfying in at least 2 ways:  
+
+It doesn't let us test that a variable is the same in 2 places.
+
+And it forces us to use setq-like structures whose nesting is
+controlled separately, rather than let-like structures which control
+their own nesting.
+
+The forward version of a real "match all these" binding would be
+something like:
+
+     (progn
+       (assert (equal A B))
+       (assert (equal B C))
+       ;;etc
+       A)
+
+Ie, it would check that everything is equal and then use one of them.
+This assumes that `assert' is the proper reversal of failing to match,
+but IST that works, as long as we interpret branching structures
+(cond, if, case) as catching those sorts of failures and continuing on
+to the next branch.
+
+A "guard" form, like rtest-assert but either returning the object or
+signaling an error, would be good for this.  It's like a super-`the'
+form.
+
+====
+Issue: Dissecting lambda forms
+
+First, because we've carefully made this all reversible, we can in a
+sense "simply" reverse the lambda form.  However, there are some
+constructs that can't be handled by reversing:
+
+	   Anything that branches execution: if, cond, case, and, or.
+
+	   Anything with side-effects, unless we can somehow reverse
+	   those as well.  eg, (setf *a-special-var* A) becomes
+	   (setf A *a-special-var*).  That's dirty, tho.
+
+	   Anything that doesn't fully use its parms.  Ignores them,
+	   drops them, 
+
+We also have to interpret the lambda list as a "forward pattern", but
+the presence of funcitons like "optional" makes that easy for simple
+ones.  Ideally, the lambda lists would be patterns in the first place.
+That would make this easier and less restrictive, eg, constant parms
+need not be fully used.
+
+====
+

@@ -1,0 +1,12 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="tehom-lists-are-equal-permuted">
+    set-exclusive-or would be easier, but it works in a funny way.  It
+    does a first pass testing the lists in-order with 'equal, and only
+    then switches to the chosen predicate.
+
+
+  </Component>
+</Rambledocs>

@@ -1,0 +1,10 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="pattern-setq">
+    We don't use setf because there are no special places to assign
+    into, just ordinary symbols.  Thus far, at least.
+
+  </Component>
+</Rambledocs>

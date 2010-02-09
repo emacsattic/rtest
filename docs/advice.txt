@@ -1,0 +1,194 @@
+Advice:
+
+================
+
+A habit to avoid:
+
+Try to avoid the habit of testing against a literal value when that is
+not exactly what you mean to test.  Use tests that address the
+functionality you are interested in.
+
+It's a hard habit to avoid - I haven't avoided it entirely - because
+it is often useful to capture the return value of the probe expression
+with C-u C-x C-e.  Simply quoting that value often gives a result that
+"works" with almost no effort.  But often the result is an inflexible
+test that gets broken by small changes in representation.  That's
+counterproductive.
+
+==============
+
+A habit to cultivate:
+
+After you make some ad hoc test to your code, if the test is at all
+meaningful, write it down as a regression test.  Then it's always
+available.
+
+But be careful to follow the above advice first: You usually don't
+want to test against literals.  Only do this for tests that capture
+the functionality you are interested in.
+
+==============
+
+When reasonable, encapsulate objects whose values you test against.
+
+A few `defconst/ant's defining test-results can make your tests
+flexible enuff to survive changes in representation.  Construct the
+objects, don't just give them as literals.
+
+================
+
+Where possible, choose to test execution, not construction.
+
+See "a habit to avoid", above, for why testing against literals makes
+for brittle tests.
+
+Even for a macro or a function that builds something, It's almost
+always better to test that a it in fact performs correctly in context
+than to test that it "makes the rite thing".
+
+================
+
+If you test construction functionality, generally test by types.
+
+See "a habit to avoid", above, for why testing against literals makes
+for brittle tests.
+
+Exception:  If the test itself supplies literal data that should go to
+a specific place, check for it there.
+
+Also, testing invariants is good.  EG if a certain list is always a
+given length, test that.
+
+================
+
+Use let-defaliases and its cousins sparingly.
+
+Always remember that you are testing several things at once with
+those:
+
+       The behavior of the function you are testing, which is the
+       proper subject of the test.
+
+       The fact that it calls the aliased function to do certain
+       work.  
+
+       The interface of the aliased function.
+
+When they're the only way to look into something, let-defalias and its
+cousins are invaluable.  But on the whole, they make brittle tests.
+
+================
+
+Testing where there is output to user:
+
+It's generally a poor idea to run literal comparand tests on
+functionality that presents information to the user.  Such tests are
+far too brittle.  If you change the wording, eg to make it prettier or
+more informative, the tests break even tho nothing is wrong.  That's
+counterproductive. 
+
+Sometimes it's reasonable to just test that the output function runs
+and builds a string or prints something.
+
+When more incisive tests are needed, you can (carefully!) use
+`let-defaliases-receive' to replace the functions that do output with
+functions that collect data just by being called.
+
+
+===============
+
+Testing where there is user input:
+
+When testing functionality that gets input from the user, it's often a
+good idea to use let-defaliases-supply to replace the interaction
+functions with something that will return known results.
+
+NB, simply calling a function that has the (interactive) spec is not
+"functionality that gets input from the user", because you actually
+supply the arguments yourself and the user isn't asked.
+
+===============
+
+Description strings
+
+It's generally a good idea to give each test a title that describes
+the functionality being tested for in this test.  EG
+
+  (setf
+    (get 'test-plus 'rtest-suite)
+    '("test-my-plus"
+
+       ;;Good docstring
+       ( "Add positive integers correctly"
+	 (my-plus 4 5)
+	 9)
+       
+       ;;Bad docstring
+       ( "four and five"
+	 (my-plus 4 5)
+	 9)
+       ))
+
+===============
+
+Test-feeders
+
+When you are making many similar tests on a function whose arguments
+are configured in a complex way, it's often useful to write a
+test-feeder.
+
+A test-feeder is a function that calls the function being tested in an
+easy-to-control way.  Their interface is not as flexible as the
+function they feed.  Eg, they may always pass a known constant for one
+argument, or always pass a 1-element list where a list is expected.
+Often they are macros, the better to take literal list-objects without
+all those single quotes.
+
+Also, some test-feeders post-process the function's results, eg to
+show that it works in a certain context.  It's helpful to encapsulate
+that.
+
+By convention, test-feeders' and other supporting symbols' names end
+with ^N, N being a number, eg the first test-feeder for `foo' would be
+named `foo^1'.  This convention helps associate them with their
+parent.
+
+Of course, you can't entirely rely on a test-feeder, because you
+should exercise the remaining parameters too.  But often some
+parameters need a lot more testing than others, and a test-feeder
+helps you with them.
+
+===============
+
+rtest-setup
+
+Suppose you want to have tests that need to set up some helper
+constants or functions.  You can put them also inside an
+eval-when-compile, but that's messy and unreliable.
+
+The solution is the rtest-setup property.  For a given test symbol,
+defining the property `rtest-setup' will cause that property to be
+evalled as a listform before the tests are run.  This is very handy
+when your tests depend on something being set up external to the test.
+
+Also, defining a pseudo-test...
+
+(rtest rtest-borrow-setup 'another-function)
+
+...will cause another-function's setup form to be evalled.
+
+Setup forms are only evalled once.
+
+===============
+rtest-unflag-symbol
+
+The suites have flags to prevent them from ever recursing into
+themselves endlessly.  It's possible for these flags to get "stuck" so
+that one or more suites won't run at all.  They think they're "already
+in progress".
+
+That sometimes happened in early development stages, but it hasn't
+happened since then.  In case it ever happens, just call
+`rtest-unflag-symbol' on the errant symbol.
+
+===============

@@ -1,0 +1,39 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-apply-walker">
+    This is mostly what we'd change to support annotations.
+
+    It would first check if data was an annotation: ie, a list
+    beginning with `annotate'.  If so, it would use (second data)
+    instead.  There'd be a special walker that specifically expected
+    an annotation and bypassed this.
+    
+  </Component>
+  <Component Name="pattern-declare-walkbinder-support">
+    The docstring could concat a more flexible description, taking some
+    building blocks.
+    
+  </Component>
+  <Component Name="pat-r-walk-symbol-mangler">
+    Similar manglers could be created, with a string param.
+  </Component>
+  <Component Name="pat-r-walkbind-by-accessor">
+    Not limited to structs, this could handle car, caddar, etc. first,
+    second, etc.  
+
+  </Component>
+  <Component Name="pat-r-walkbind-splicing-list">
+    This will go away, because it shouldn't have to exist for every walk
+    approach.
+
+  </Component>
+  <Component Name="pat-r-walkbind-vector">
+    Handling rest-walker is not a problem - it legitimately should be
+    dealing with a list, not a vector.  If we tried to make a vector
+    for it, the positions and length would be all wrong, and that's not
+    what we feed backquote when we want to build a vector.
+
+  </Component>
+</Rambledocs>

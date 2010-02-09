@@ -1,0 +1,32 @@
+System Requirements:
+
+====
+
+Elisp version:
+
+ * Emacs
+
+ * The cl package in Elisp.  regress.el 1.5.0 was the last version
+   that did not require cl.
+
+ * A recent version of comint, or an earlier version plus
+   comint-redirect.
+
+ * Some utility packages, included in the ancillary directory:
+
+   local-vars
+   arrange
+   tehom-cl	(Needed for ELisp)
+   tehom-comint	(Needed for Common Lisp)
+   safe-equal
+   handhold
+   caselet.el
+
+====
+
+Common Lisp version:
+
+ * All of the above.
+ * A Common Lisp interpreter.
+
+====

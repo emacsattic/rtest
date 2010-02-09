@@ -1,0 +1,16 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-elisp-report-results">
+    We need not convert to html if there are no failures to report.
+    To be clean, define a constant for that case, which can become a
+    tiny HTML doc if needed.
+  </Component>
+  <Component Name="rtest-insert-call">
+    The Common Lisp version doesn't have this.  Perhaps interaction
+    function should vary by buffer mode.  And for CL we'd like to use
+    (eval-when (:compile-toplevel)) instead of eval-when-compile
+
+  </Component>
+</Rambledocs>

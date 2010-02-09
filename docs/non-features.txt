@@ -1,0 +1,108 @@
+Non-features
+
+Features that could have been in this package, but were either deemed
+too much trouble for too little payoff, or are simply awaiting someone
+with free time.
+
+===
+
+rtest could defmacro an alternate style of defun that defines not only
+a function body, but a range of tests as well.  It would be appealing
+and convenient, and I'd really like to do it, except I'm not sure it
+would be used much.  It's essentially defining a different Lisp.  If
+nobody else used it, it'd be kind of pointless.
+
+
+===
+
+While running tests, we could spin a spinner, in Elisp at least.  "10
+tests done", "20 tests done" etc.  It'd be nice for long tests, but
+it's not badly needed.
+
+===
+
+Two more graders suggests themselves, but haven't proven useful yet:
+
+	:apply / apply-grader, for user extensibility.  It would use a
+	user-supplied function as a grader.
+
+	:any / grade-any, like every but it succeeds if any element
+	of a list or vector succeeds.  Unlike the `:field'-type
+	graders, it would not return nested results, just a single
+	"nothing matched" failure.
+
+===
+
+Could use special variables in place of bound-syms, bound-vals in the
+entire probe call-chain after symbols are bound.  that would mirror
+their actual behavior better, but expose them more.  They should be
+covered with a `let' if that is done.
+
+===
+
+The pattern-destructuring functions could handle with circular
+structures by first tagging them as safe-equal does, then only
+exploring parts that can be reached without circularity.  We'd need
+another walk function that meant "don't explore this part, it's the
+same as something we already explored"
+
+===
+
+safe-equal could have custom comparison functions for some structures.
+It would require tehom-type-of and some logic to deal with cl's
+fake-structs.  It may be better to do so in functions that surround
+the vector-comparisons and cons-comparisons.
+
+===
+
+A meta-instruction that would stop testing if a suite has already
+found N errors?  It's already possible, but I'll wait until it seems
+needed.
+
+===
+
+A handholding test-construction utility, using widgets in emacs.  It's
+partly done, but it ran into 2 showstopping problems:
+
+      Widgets does not support recursive types, so the recursive tests
+      were out.
+
+      Widgets has a bug, values in nested sexp-types get "converted
+      into a string" more than once, so the value often started out as
+      \"nil\", which is a nuisance.
+
+Aside from the 2 showstoppers, rtest-handhold.el merely needs the rest
+of the data filled in.
+
+===
+
+The pattern functionality could use predicate-style walkers in
+addition to report-style walkers.
+
+Some predicate-style walkers are already coded, but some don't and
+none are used by pattern.  There is also code to declare different
+"realms" of walker style (eg predicate style or report style).  This
+hasn't proved neccessary for rtest, but its usefulness is clear.
+
+By this mechanism, pattern could be extended to support pattern
+unification, also very useful.
+
+For this to happen, in pattern-deval the pat-r- symbols should all
+become pattern-, except for one place where it borrows test setup.
+Even that should be renamed.
+
+===
+
+Common Lisp is *almost* supported.  It runs for some things, but I got
+tired of dealing with the things CLISP doesn't quite support, and I
+decided it was better to release it instead of letting it wither while
+I wrestled with CLISP
+
+===
+
+It would be very nice to manage tests along the lines of (eval-when
+(:test)), so they wou;d know that they should be available at testing
+time without extra manual work, but it's quite impractical because
+it's not supported at all in Elisp or Common Lisp.
+
+===

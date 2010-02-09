@@ -1,0 +1,90 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    <Node>
+      <Node>
+      <Text-Node Title="Structures as tests">
+	In the first design, the structure ctors had to actually be
+	visible at eval-time and compile-time to all code that
+	included such tests.
+
+	This is not true for any other sort of test.  Not lists,
+	symbols, nor even let-defalias and its cousins.  The
+	unexpected load problem showed the seriousness of that.
+
+	Also, the current approach is forcing us to write (append
+	'(...) structure-tests... ), which is awkward and ugly.
+
+	This strongly suggests another approach: Perhaps recognize
+	some tag as meaning that the rest is a structure to eval and
+	execute.
+      </Text-Node>
+      <Text-Node Title="What part is the tag?">
+	Should the tag be the probe, or the car?  
+	
+	Because we in effect substituting a whole new test, and
+	because docstrings can be included anyways, I'm choosing to
+	make it always the car.
+	</Text-Node>
+	<Text-Node Title="What part is the test?">
+	  The entire cdr.  Any flexibility we need can come by calling
+	  an appropriate function.
+
+	  And it's evalled, so it doesn't need to build a structure
+	  and then unbuild it.
+	</Text-Node>
+      <Text-Node Title="What tag">
+	`t' is tempting, but a symbol specific to rtest seems less
+	confusing.  `rtest' is concise but not specific.
+	`structured-test' is specific but verbose.  Perhaps it's too
+	specific, in case we ever run other tests.
+
+      </Text-Node>
+      </Node>
+      <Text-Node Title="Compile vs interpreted">
+	All I want to note is that compiled tests make almost no
+	sense.  They're not run very frequently, so it's not important
+	to make them fast.
+      </Text-Node>
+    </Node>
+  </General-comments>
+  <Component Name="rtest-one-test-object">
+    switch by the thing's type.  Later the case statement may become
+    an alist mapping tag to function, thereby supporting
+    extensibility.
+
+    That assumes that the auxilliary functions will all execute
+    different kinds of test.  But it mite be otherwise; eg, they mite
+    indicate whether testing should continue or something like that.
+
+    Converting between case and mapping on structures should be
+    easier.  encap should do that, with something that recognizes
+    `case' and converts to an alist declaration + a call to something
+    else that calls the matching thing appropriately.
+
+    The business with setting a flag doesn't avoid running the same
+    test twice, just nesting inside itself.  We could push all the
+    flags and undo them when we had entirely finished. if that is a
+    problem.
+    
+  </Component>
+  <Component Name="rtest-inherit-one-probe">
+  </Component>
+  <Component Name="rtest-make-inheriting-closure">
+  </Component>
+  <Component Name="rtest-symbol-setup">
+    It would be better to let any error propagate to rtest-one-symbol.
+    An error should stop the symbol at hand, but not stop rtest.
+
+  </Component>
+  <Component Name="rtest-one-symbol">
+    This could use either rtest-wrap-errors or condition-case to stop
+    errors.  Since we expect the only error that makes it back here is
+    that a setup form can't be evaluated, we'll use condition-case.
+    Change it if we ever can use more exact reports.
+  </Component>
+  <Component Name="rtest-coerce-to-fail-summary">
+    This could report more exact errors by testing the type piece by
+    piece, and potentially making a failure after each type.
+  </Component>
+</Rambledocs>

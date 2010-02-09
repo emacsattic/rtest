@@ -1,0 +1,1038 @@
+Design notes
+============
+
+Why I did things the way I did
+==============================
+
+This is largely me talking to myself during the design process, but
+you're welcome to listen in.  I've edited it a little for clarity and
+to remove ramble, but otherwise it's what I designed from.
+
+I believe design motivations are a somewhat important part of
+documentation that often gets overlooked.  Programmers hate to
+document, so they put if off, and then come up with a bloodless
+compendium of the functions and constants defined in the source.  That
+doesn't help a maintainer understand why things are the way they are.
+
+
+==================================
+
+Idea:  Making the test syntax more regular
+
+The elements of a test list could always be parms to a test function,
+which defaults to equal for 2 parms, and identity for 1 parm, and has
+no default for more than 2 parms.  :func gives a non-default function
+which takes all those args.  But this is unneccesary: 2 slots gives
+all we need.  It would be a bit more elegant, but not much.  It also
+changes the semantics a lot.
+
+Rejected.
+
+==================================
+
+Doing tests as just the grader, with a let to set up variables, means
+we can't get intermediate feedback, we only get whether it passed or
+failed.  Perhaps a new magic variable could be defined for that?  And
+if the grader sets that variable, it would be shown, otherwise result
+would be shown.
+
+Rejected: The user providing a list of variables.  It'd be a chore to
+rewrite all grader functions, whatever they may be, to set those
+variables.
+
+==================================
+
+
+Automatically checking somefields of a structure while ignoring
+others.
+
+This would be a new equality-predicate.  Syntax would be something
+like
+
+(struct-test-equal my-object :field-0 value-0 :field-2 value-2 )
+
+The property cl-struct-slots tells a structures' slots with cl.
+Access it with (get $struct-tag-symbol 'cl-struct-slots)
+This could be used to make slot on-off-specific tests with a special
+equals. 
+
+The advantage is that one could write specific structure-tests without
+a lot of work.
+
+========================
+
+Issue: How rtest mite work function-by-function instead of as one big
+test.
+
+Motivation:  
+
+One often needs to test only a single changed function.
+
+Tests are most naturally grouped by function.
+
+Sometimes one function wants to inherit another one's tests with minor
+changes.  EG, add an extra parameter which in effect says to go thru
+the simple way.  This would make that possible
+
+It paves the way for including tests in functions proper, to interact
+with other function information such as inheritance.
+
+Criteria: 
+
+We'd like to retain the old test format, for backward compatibility
+and for tests that can't be confined to specific functions.
+
+
+Implementation:
+
+Probably it will become a property of the function, eg
+
+(put 'my-new-func 'rtest-test 
+     '( "List of tests" ... ))
+    
+Then there has to be code for running a function-test as if it were a
+suite.  And code for reporting it, properly grouped.
+
+And there has to be a way to group functions.  In Common Lisp, modules
+would be used, but Elisp doesn't have them.
+
+It's easy to write a list of functions "in" a module, but interpreting
+them while retaining backward compatibility is a chore.  
+
+They could use separate properties, and the selector-thing could find
+both.  But once it's presented both to the user, mixed, that
+distinction is lost, so it does us no good.
+
+We could switch on the basis of whether the first one after a possible
+docstring is a list or an fboundp symbol.  In fact, a symbol could
+always mean "run this function's tests".  That means a little extra
+complexity in the test suite handling, but that's OK.
+
+So what's the return type?  How do we indicate that a suite had
+individual functions which themselves were suites?  How does that work
+out?  There could be an intermediate type... but to mirror the test
+layout, it would have to be a sometime thing.  A member of a suite
+could either be an individual test or a function-suite.
+
+That means the structures involved would have to be distinguishable.
+But if they were true structures, they couldn't be passed back to
+Elisp.  They could be named list structures, however.  Which is what
+I'll do.  This requires changing any rtestion tests of reporters
+that used literal lists, instead of using the ctor.
+
+And that adds extra code to the reporter module, but that's easy now.
+
+=====
+
+And then we'd like to be able to let functions "inherit" tests from
+other functions.
+
+The cleanest way may be for a function to also have a property that
+says that it inherits one or more other functions and for each, says
+how its arglist and tests are reconstructed from that.  So something
+like:
+
+(put 'my-new-func 'inheritance
+     '(other-func
+	;;how the other one's arglist becomes our functions arglist
+	:translate-input  (#'lambda (&rest arglist)  )
+	;;How our test results become the other one's test results.
+	:translate-output (#'lambda (test-exp)      )
+     )     
+     '(second-other-func ...))
+     
+ISTM when we're considering a function, it's easy to add a test for
+doing the other functions.
+
+Getting all the predicates, etc will not be as easy, but we could just
+pass that as another arg to the other functions.
+
+
+To actually execute it, we must look at that first function's tests
+and replace the call in the grader with our own call.  For now, we'll
+only use graders that have that function as a head.  Later, we'll
+replace it anywhere it occurs in the probe.  Even replace it twice, if
+needed.
+
+But we don't want to replace it literally, we want to transform it.
+This requires some walking.  But rebuilding the grader is a good idea.
+Rebuilding the probe won't be as good.  We're transforming the output
+value only.
+
+new-probe    = (apply new-probe (translate-input old-probe-args))
+new-match?  Unless the transformer is identity, it becomes a predicate.
+new-predicate = `(lambda(x) (old-predicate (,translate-output x)))
+
+Whitebag tests are cancelled, and if they're the only ones, the thing
+isn't run.
+
+Or we could pass the transformer functions down.  Do nothing with them
+if they're nil.  NB, this ignores multiple values for now.
+
+===========================
+
+Issue: Does function-inheritance use an special key for calling the
+function, to make it easier to find?
+
+We don't want a abbreviation for calling the function.  eg, where we'd
+just supply arglist and implicitly call the function with that.
+
+For one thing, it has little or no abbreviating power.  One has to
+write `:call-with-args args...' (or whatever) rather than (my-func
+args...).  Nothing is saved.
+
+For another thing, it's good to supply literal examples of the call.
+
+For another thing, code to support it is extra complexity.
+
+=========
+Issue:  Multiple-value returns
+
+We'd like to handle multiple-value returns properly, always.  
+
+We can't detect multiple values, so we have to turn all return values
+into a list any time we mite use them, with multiple-values-list.
+
+But ordinary predicates don't expect that their argument to be
+ensconced in a list.
+
+So we could define a key for predicates that accepted the multiple
+value returns as a list.  Or we detect when predicates take multiple
+values and feed them as many as they will accept.  Our approach
+depends on what we do with them.  `:test' needs to trigger on keyword,
+because it hasn't got values, so we mite as well do predicate that way
+too.
+
+NB, whitebag doesn't need this, because it doesn't ever deal with
+return values as such.
+
+=========
+
+Issue: What shall we do with :test?  
+
+`:test' used to be OK, but now that I want compatibility with Common
+Lisp, it has problems.
+
+Remove the keyword, so predicate must always be used? (No)
+Build a runtime predicate from it? (Yes)
+Making RESULT special is no help.
+
+========
+
+Issue: Overall `let'
+
+I'd like overall "let" and "flet" expressions for entire batteries of
+tests.  They'd make repeated expressions easier to write, without
+resorting to defining them specially.
+
+========
+Issue:  Whitebox tests.
+
+We'd like to be able to feed whitebox tests the top-level form to
+think about, even if it's not the head of the call.  EG, it's in a
+`macroexpand' or an `apply'.
+
+(Note:  Later the whitebag testing proved worthless and was junked)
+
+On handling multiple values
+===========================
+
+In general, we'll have to remember multiple value returns in some
+other form, lest they be forgotten, and reconstruct them afterwards. 
+
+Naturally we'll use multiple-value-list and turn them into a list.
+
+Tests and predicates can bind them with destructuring-bind as if it
+were multiple-value-bind.
+
+So the rule is:
+
+   Ordinary tests (comparand, test, predicate) get only the first
+   value of the probe's return values
+
+   Multiple-value tests (test-multiple-values,
+   predicate-multiple-values) get a list of all of the probe's return
+   values.
+
+Elisp vs Common Lisp
+====================
+
+Background: Elisp fakes multiple value returns as real lists.  They do
+not spontaneously degrade to their first element as multople values in
+Common Lisp do.
+
+The function may have returned only a singleton value, or may have
+used (values ...).  In the second case, Elisp return a list, which
+behaves like a prefectly normal list.
+
+So tests in Elisp must manually co-ordinate whether predicate says it
+uses values with whether the test gives them.  So this is mostly for
+Common Lisp.  So a predicate in Elisp is always getting a list of
+values?  What happens if a function returns multiple values and is
+called with a singleton predicate?  In Common Lisp, that just gets the
+first value.  In Elisp, it's misleading or fatal.  Elisp can't sound a
+warning, and it *shouldn't* be used to disassemble lists.  So just
+don't mismatch them in Elisp.  What about returning a singleton value
+to predicate-multiple-values?  Again, the singleton would try to
+"disassemble" the list, which is wrong.  So Elisp in effect equates
+the two predicates.  The distinction is only made in Common Lisp.
+
+So somehow, Elisp must use the same functions while Common Lisp feeds
+the singleton predicates with (nth-value 0 _).  They must diverge on
+what constitutes the list of grader functions.
+
+However, this works out because in Elisp, values-list is also
+identity. 
+
+eval giving multiple values
+===========================
+
+Also, does eval in Common Lisp give multiple values or not?  If not,
+we'll have to get them some other way.
+
+
+Non-issue:  Whitebag testing
+============================
+
+Since whitebag testing is only done in Elisp, and Elisp
+pseudo-multiple-values don't degrade, nothing special needs to be done
+to prevent them from degrading.
+
+However, if at some point the Elisp whitebag code is used as a base
+for similar functionality in Common Lisp, be aware of this issue.
+
+(Note:  Later the whitebag testing proved worthless and was junked)
+
+
+
+==================================
+How to deal with bindings (`let's)
+
+
+A "let" form makes the variable available to probe and grader both.
+This requires work in the test functions, and may make them
+unavailable for other use.
+
+We don't use progv.  It's almost sufficient because it binds
+dynamically.  But it does potentially allow interference between
+user code and test if they share names.
+
+So we translate both probe and grader into lambda forms taking all
+the bindings.
+
+
+============================================
+Issue: Organizing the grader expressions by type
+
+Decision: We keep the tests in outwardly homogeneous lists, gradually
+paring the lists.  Efficiency is not an issue here, but if we ever
+needed it, we'd pre-process them and separate the types, save them in
+structured form, and extract them in a different way, but externally
+with all function calls appearing the same.
+
+
+===========================================
+Issue: Dealing with multiple value returns.
+
+Because Elisp "fakes" multiple values, we can't just use
+multiple-value-list on every probe return.  That would make multiple
+values appear the same as lists.  This would mean that some tests that
+were correct in Elisp were wrong in Common Lisp and vv.
+
+Approach: 
+
+So we say that if any test looks at multiple values, that implies
+there were multiple values.  (test-multiple-values,
+predicate-multiple-values, etc)
+
+
+Another approach was to provide a field that simply indicated that
+multiple values were to be looked at and returned as a list.  But
+altho it would make it *possible* to make all tests correct in both
+Elisp and Common Lisp, the temptation would be to not.  So no.
+
+
+================================================
+
+Issue: When a suite is hidden, it can't be run by giving its name.
+
+ISTM because the interactor won't recognize the name.  rtest-defun can
+do it, but that's not enuff.  
+
+Perhaps the interactor could accept non-matches and try them out
+anyways?  
+
+Perhaps hidden-ness was a mistake?  
+
+Perhaps the a second interactor that looks for hidden as well?
+
+Perhaps a prefix arg triggers that?
+
+Perhaps tests could have a level, and the user sets a level which
+matches the various tests.
+
+Perhaps tests could have properties, which make them available or not
+as they match uer-defined properties.
+
+Perhaps tests must be enabled specifically, but a top-level test
+reaches down and makes its pieces available?  (IE, there is one *real*
+top-level test, which enable adds to and subtracts from).
+
+Perhaps that's a second method of interaction, configurable?  That
+sounds best.  As a side-benefit, it becomes easy and meaningful to run
+all tests.  And we can automatically construct tests with imenu, and
+looking at Common Lisp packages is more like how Elisp rtest works too.
+
+(Chosen and later coded)
+
+============
+
+What objects graders return:
+
+Originally they returned just t or nil, like a predicate.  But this
+was not expressive enuff for nested tests to give meaningful values.
+
+The question is, what type should graders return?
+
+Nested tests need some way of saying which branch they explored, and
+would like to indicate the actual probe value too.
+
+It can't be anything that includes "test" as such, because graders
+don't know it (vv, it knows them)
+
+Graders must sometimes indicate what the grader was, eg if it couldn't
+proceed because of what it was.  
+
+We could use a dummy test-key, like :map, but that would wrongly
+appear to be a valid map-test which could cause problems.
+
+There could be another test-key, like :bad-map but that makes
+test-keys proliferate.
+
+It could be part of failure-indication, and dummy-test would have its
+own dummy type.  But then it's not clear how to stringify it.
+
+rtest-single-test-failure could be changed to have both an error
+message and an erroneous object.  Then reporter wouldn't need to know
+all those messages, nor switch by test type.  It would just need to
+know a comparand.
+
+(Chosen) Could define another type, rtest-single-failure, and let it
+replace rtest-single-test-failure
+
+(Chosen) We also define rtest-nested-test-failures for multiple
+failures that have no further structure.  It will prolly be stripped
+down and incorporated into the failures list in other functions here,
+rather than in reporter.
+
+
+========================
+Issue:  Evaluating tests stand-alone
+
+A useful thing to do, while developing tests, is to C-u C-x C-e in the
+buffer to see how it goes by hand.
+
+However, this doesn't work well with around forms and let forms.  The
+normal execution has no way of detecting them.  
+
+
+One approach is for rtest to instead parse the thing, finding
+(probe-and-grade PROBE GRADERS...) somewhere in the mix, and splitting
+there.  Then probe-and-grade would have to normally be a macro that
+just runs body.
+
+OTOH, it may not be desirable to do this, because that makes it harder
+to repeat forms around different tests.  In the future, it mite be
+helpful to define forms per func that automatically surrounded every
+test.  There is no way they'd appear to be within the form.
+
+Another approach would be to create a variant eval-last-sexp which
+would essentially run the probe and report.  Or a variant rtest-defun
+which would report all probes and come back.  Or
+rtest-eval-next-sexp-as-test.
+
+========================
+
+The :include field
+
+I wanted to make writing repetitive tests easier.  
+
+But OTOH single tests should still be runnable alone, as
+rtest-next-sexp needs to do.
+
+So I didn't want to use a property of the suite or of the suite-symbol
+
+So I will use inclusion:  The keyword :include X includes X as test
+forms, usually for `around's and `let's.
+
+It will not be added to graders' parsing (eg for :field, :map, or
+:every) unless there's a need for it.  Graders can't do anything with
+`around's and `let's
+
+========================
+
+Function inheritance
+
+ISTM this could save a lot of time.  When writing tests, I already
+often find myself duplicating another function's tests, and wishing I
+could just say something like "bar, among other things, satisfies the
+same tests as foo, except that bar takes another parameter of nil, and
+the result to test on is the car of bar's result which is a list".
+
+At first glance ISTM `:around' and `:let' could help by siphoning off
+the various around and let forms so they wouldn't have to be parsed by
+the inheritance manager function.
+
+But now it seems it's not such a good idea.  `:let' and `:around' are
+often specific to the function being called.  However, when I tried to
+come up with examples, like special variable bindings or catch clauses
+in the calling function, ISTM they were not plausible tests to inherit
+anyways.  
+
+Maybe :include will allow the :around and :let forms to be defined in
+a different place and included in a controlled way.
+
+`let-defalias' and its friends potentially pose some problems if the
+inheriting function uses the aliased functions in some other way, or
+is one of the aliased functions (perhaps they're mutually recursive)
+
+However, we are only inheriting from tests we understand, which for
+the moment means tests whose probe is exactly a call to the tested
+function.  If let-defaliases are `:around' forms, they could pose a
+problem, which is another argument for not automatically including
+around forms.
+
+Sometimes a function will want to inherit one batch of tests and not
+another.  ISTM a litewait way of doing so is to simply use the test
+inclusion mechanism to separate the various types of tests, and
+include those tests in both places.  
+
+
+So we need to:
+express probe transformations
+express result transformations
+parse probe expressions
+alter probes
+alter results
+use probe and results in their altered form.
+
+ISTM it may make sense for the result-alterer to use `:field' or
+something like it.  It may even make sense for the result alterer to
+be a full grader expression, so that other tests like type can be done
+at the same time.
+
+Would it make sense for probe transformations to be another type of
+probe or test-clause?  No, they don't seem to fit well into the
+existing expression.  They'd have to be signalled in some way, which
+would make parsing harder.
+
+ISTM they'd better be another property of the test suite symbol,
+something like `rtest-inherit'.  It would need to know: What suite to
+inherit from.  (Later possibly from an already-inheriting suite?)  How
+to transform the probe arguments.  How to transform and possibly
+side-test the result object(s).
+
+=======================
+
+Issue: How do nested fields know which field is causing the error?  
+
+Motivation: When the probe result gets complicated, it's nice to be
+able to see at a glance where the error was nested.
+
+In selective-equal, now defunct, nested fields used the
+*failure-indication* special variable, but that's no longer available.
+
+We could use a special variable again, threaded as a parm thru all
+field-manager functions, including all graders?  If so, it should be
+constructed as part of the error directly.
+
+(Chosen) Or field-graders and probe-manager could be the only things
+to catch errors, which they would wrap in the appropriate field report
+or probe report.  The reporter code would have to indicate field-ness
+more clearly, tho.
+
+
+=======================
+
+Issue:  How do destructuring-bind things alter their cdr reports to
+report fields as in lists, not in cells?
+
+Altering the report-object is difficult because it's already
+stringified.  
+
+Perhaps format+object-list would really have been a better
+representation, and we could walk the tree with stringify.  A good
+format spec should *not* use %S or ~S, it should use lambda forms
+applied to positional objects, and key forms applied to acquire
+objects key-like.
+
+But this in effect wants every report object to have a variant that is
+stringified.  If we do that, it makes sense to build the report as
+bigger strings, rather than following the objects as such.
+
+And if we do that, perhaps the report objects could be built before
+crossing over?  If so, it could even display in HTML?  That would get
+rid of those numeration-syms.  GUIsts could read it in their browser,
+w3-ists and psgml-ists could read it in a buffer, and minimalists
+could read it as-is.
+
+pp sections would be <PRE>...</PRE>.
+
+Or an XML variant?  Nah, because what I want is essentially all
+markup, which would be turned into HTML anyways.
+
+So, once I set foot again on the slope of non-text representation, I
+go all the way to writing the report in HTML.
+
+=======================
+
+Grader structure for grade-pattern:
+
+A grader must translate into something like what
+`rtest-pattern-bind-aux-1' builds.
+
+We could use rtest-grade-by-test, or use rtest-run-grader-list.  it
+depends which is a more convenient form.  It isn't clear that we could
+even use grader-list: What would result refer to?  In the following,
+what does predicate think it's predicating?
+
+  ... :pattern ((A 2 B) :predicate evenp :test B) ...
+
+Still, it'd be nice not to have to spell the test out with '(and ...),
+especially for recursive tests.
+
+  ... :pattern ((A 2 B) (and (evenp A) B)) ...
+
+There could be something like :field to get to specific symbols with
+recursive tests.  But sometimes symbols will interact - as fields
+sometimes will too.
+
+There's little point having direct comparands, and predicates can
+easily just be used on the symbols themselves
+
+We could implicitly join the remaining tests with (and)?
+
+  ... :pattern ((A 2 B) (evenp A) B (= (+ A B) 7) ) ...
+
+But that would mean forever we will treat everything following as
+tests joined by and.  Not further positions could have any special
+meaning.  It's too early to marry that, and we can achieve the same
+logic with just a littler more verbosity.  And if we ever switch to
+that, it will be backwards compatible to the explicit-`and' tests.
+
+
+So a grader would look like:
+
+   (... :pattern ((A 2 B) (and (evenp A) B)) )
+
+And a grader's internal structure would look like:
+
+  (:pattern pattern tests)
+
+=================================
+Issue:  The overall structure of a test
+
+Let's consider changing the format to be more similar to normal Lisp.
+
+Motivation: It would be more accessible to those without experience
+with rtest.  And it would be easier to turn non-rtest code into tests.
+
+IOW, there'd be a form that was recognized within the tests, which by
+itself just ran the test bare.
+
+Anything special like save-excursion would be done thru our own
+caller-indirection.
+
+So it would look something like:
+
+(let* 
+  ((a 1) (b 2))
+  (rtest-here
+    "Documentation"
+    (do-probe arg1 arg2)
+    :test (foo)))
+    
+
+Issue: How would we deal with lets that are supposed to provide
+non-special variables to both?  Walking the whole form and
+distinguishing special/non-special variables is way too much work for
+too little payoff.
+
+Issue: Dealing with includes...  They could be feeder macros, but then
+it's tuffer to re-use them in combination.
+
+So it'd be just too much work, and we can essentially do everything as
+easily without it.
+
+=================================
+
+Issue:  Indicating auxilliary information, such as inheriting from
+other functions.
+
+We've used up lists and symbols, so... vectors?  Numbers?  Strings are
+used too, just the one time.  Vectors seem best for auxilliary
+instructions.
+
+OK, I tried that, and it quickly became apparent that writing
+carefully structured vectors was going to be a big PITA.  
+
+The first thing I noticed was that I really wanted to use structures,
+and vectors were basically standing in for them.  However, writing the
+structures inside the usual quoted tests poses two problems: The
+quotedness has to be escaped and unlike everything else, they require
+the actual presence of rtest to merely read (not just to test)
+
+So instead, test forms that start with the special symbol `rtest'
+treat the cdr the form as a list-form, applied in place of
+rtest-one-probe-0.
+
+============================
+How can failures of probe become probe-result reports instead of
+simple reports?  
+
+Motivation: Using probe-result format tells the dosctring and the
+probe expression.  Without those, it can be a little hard to find the
+exact test that is giving trouble.
+
+We could try to always translate into report format first.  But that's
+hard to guarantee, being in so many places.
+
+Our condition-case could distinguish errors that are rtest-report type
+vs others types, and re-wrap only the latter.  But the real question
+is, how do we find the info we need, docstring and probe expression?
+
+We could build a probe-expression return first, and discard it if we
+got no failures.  Ugly.
+
+The real issue here is that, OK, if we just can't get the docstring
+and sexp there's no way to report much about the probe, but if it's
+other parts (the graders) that won't parse, we should be able to wrap
+that failure in a meaningful probe report.
+
+We could add another function that interprets the graders and passes
+them on.  If it had a problem, it would wrap it into a single
+problem-return, which we'd make into a probe-failed result.  So we
+want to interpret the grader list later than we have been doing.
+
+Also note that the probe-result is built fairly far down the
+call-chain, and could be built hier.  But then it wouldn't know the
+result of the probe expression, or that would have to be passed.
+
+So either we 
+
+   build probe results in multiple places.
+
+   pass some data (result, etc) upwards and build it as hie up as
+   possible.
+
+   leave it as it is.
+
+However, I gave this a bit of a try, and it was very buggy.  Other
+stuff (Inherited tests) wants the probe to be parsed exactly as it is
+now.  So problems must throw probe-results.  Perhaps there could be
+something up top that only catches probe-results, something else that
+catches general results, and something else that catches general
+failures.
+
+OK, since failures are potentially generated in all sorts of states,
+we're going to have to expect them to come from everywhere and catch
+them in appropriate places, allowing for their various types.
+
+condition-case doesn't handle the results of throw, but there's no
+reason we need throw instead of signal.  It will take a little
+rewriting, but not much.
+
+OK, now I've written define-condition, created conditions, and used
+them.  But this is such a bloated, messy way of doing it.  Perhaps it
+would make sense after all to build a partial probe result and put the
+name, results, etc in as we go along.  Then if we get an error, we can
+handle it in the one single place.
+
+But now, what does the inheriting thing do to get the name? This is
+still a mess.
+
+OK, what I'm going to do is what I was avoiding: Build the probe
+return gradually.  It's kind of yucky, not at all referentially
+transparent and so forth, but it's nowhere near as ugly as the other
+solutions.  And ISTM it models the behavior reasonably well: When
+there's an error, we want to provide as much probe data as is
+available, so probe-result data should be updated ASAP.  Passing it
+around to be modified mirrors that.
+
+============================
+
+Issue: Insulating required one-time code from eval-time
+
+Some things must be present at test-time but not at eval-time.  EG,
+when I used the rtest-knownbuf stuff in tehom-psgml, there was a brief
+problem when it couldn't find make-rtest-knownbuf, which of course is
+defined inside rtest.  It must be made to wait until rtest is loaded.
+
+
+Perhaps something could declare them the first time thru the test?
+Ordinary progn could do that.  It works if followed by
+(rtest-make-skip-summary).  See example in tehom-psgml.  BUT it gets
+executed multiple times, which limits what it may safely contain.
+
+
+It could be a symbol that stops itself from repeating.  But that won't
+work, the flag's undone when it finishes.  And it's klugey anyways.
+
+It could be a macro-call with a unique identifier?  But getting a
+unique identifier is burdensome to the user, and that's klugey too
+
+A different type of symbol property that rtest understands and runs
+only once?  Then dependencies between such suites would be explicit,
+which is good.  In fact, use a property, but automatically call it and
+flag it already-evalled.  Chosen.
+
+
+=============
+
+Issue:  Support for transforming literals in graders
+
+EG, when you regret using literals in grader expressions, but you'd
+like to preserve the actual tests.  Search-and-replace isn't enuff.
+
+We could loop thru all suites inside `eval-when-compile's and
+transform their matching literals into references to a constant.
+Quotedness would have to be respected.  
+
+It could replace a list with a ctor for a list structure, similarly
+for vectors and CL structures.
+
+Perhaps take a roster of symbols whose values are to be replaced by
+themselves.  The roster itself should be a single symbol, to save
+typing it many times.  Perhaps define it per file?  Similarly, replace
+:map with the various fields of a list structure or vector structure.
+
+This would extend encap.el
+
+But I prolly won't write it.  It basically a code-aware
+search-and-replace, which is nice but is a whole project in itself.
+
+=============
+
+Issue:  Building tests more easily
+
+This is particularly an issue for inherited tests, which could have
+smart defaults for `do-call's lambda list, which could prompt for what
+to inherit from, etc
+
+We could borrow customize functionality to build tests, including
+inheritance.  That'd be nice hand-holding.  But after I looked over
+widget and customize, it'd be a huge amount of work.
+
+
+=============
+
+Issue:  How does report formatting distinguish text and objects?
+
+One desideratum is to make actual objects wait until format-time to be
+formatted, because they may want
+
+But it's also necessary to distinguish objects whose values are
+strings from strings passed by value.
+
+We could: 
+
+   Tag non-strings at creation time
+   pp non-strings then ... but then they lose info.
+   Guess which is which later.
+   Tag non-strings before they are placed in the list.  
+
+With either tag strategy, we need only distinguish between list and
+string at format time.  Or we could distnguish 2 different heads that
+way.  This could even extend to letting us distinguish string-trees
+from other lists.
+
+Since non-strings are pretty much already bundled up here, it doesn't
+seem like it would be hard to manually tag them.  At worst, a macro
+takes a whole list and tags it.
+
+    (rtest-make-single-failure
+      result "didn't match" grader)
+
+    (rtest-make-single-failure
+      "Predicate failed"
+      (rtest-show-val result)
+      (rtest-format-object-and-name grader 'comparand))
+
+And they'd be represented something like (respectively):
+
+    (
+      (fmt-object result)
+      "didn't match"
+      (fmt-object grader))
+
+    (
+      "Predicate failed"
+      (fmt-show-val 'result result)
+      (fmt-show-val 'grader comparand))
+
+So formatting bcomes a little mini-language again.  But only to
+support the distinction between objects that happen to be strings and
+true strings.
+
+rtest-make-single-failure formatter wouldn't have to be a macro, but
+fmt-show-val would have to be.  In fact, we'd use a string feeder for
+that.
+
+So build something that makes one tag, and uses the one tag.
+
+One problem I'm encountering is that this seems to require nesting.
+The macro may be able to do it ahead of time, I suppose.
+
+Another issue is whether to format objects of unexpected types.  Is it
+better to show a problem immediately or not?
+
+Another issue is whether to try to support string trees.  To really do
+that, we should test 'em first, and while testing it may make sense to
+flatten them.
+
+(After a little tryout:)
+
+Let's go over what we actually need:
+
+We need to handle the names-and-values more nicely, which means having
+more control over them.
+
+We mustn't style them prematurely, before we hit the htmlify stage.
+
+So it looks like we need to save both name and value for each object.
+
+So for some purposes we'd always have text and a table of objects.
+For some other purposes we'd have a format string.  Shall we support
+them both?  
+
+Well, supporting just tables gives us no clue what the report is
+about.  Supporting just tables-and-title is a little better, but not
+very flexible.  Supporting just a format string forces premature
+styling.  So either tables and title or tables and formatted title.
+
+For now I'll go with a simple text title.  That's easy to change
+later, and backward-compatible.
+
+==============
+Side-issue:  List-style format lists
+
+One drawback that list formatting has vs the byzantine format-string
+language is that it can't easily delay formatting.  Apply-style
+list-formatting can, but that's weaker than this.
+
+That's not a huge big deal, but it interferes with another virtue of
+list-formatting, which is that stringification can be delayed until a
+particular output style is known, eg HTML which we use here.
+
+One approach is to write something like string-trees whose elements
+are extended beyond strings, and are in fact structures whose heads
+indicate content-type, which the markup will interpret.
+
+
+=============
+
+Issue:  What's the policy for loading tests after compilation?
+
+We've been using the inherited strategy of just never compiling them
+in.  That's getting a bite miserly for this big project.
+
+Should trying to test a symbol force a load of its source file?  That
+requires recognizing where the symbol came from.
+
+Should load or compile try to manage it, eg by trying to read only
+those parts that describe tests?
+
+Should we perhaps just let them be compiled?  (Far and away easiest)
+That involves stripping off all the eval-when-compile from everything.
+How to recognize them? (setf (get .... 'rtest-suite) ...) does it.
+
+Decided: We won't do anything different.  The user can write
+eval-when-compile or not, as they like.  But rtest-edit should
+manage that better:  Make eval-when-compile optional, and look for
+(setf (get .... 'rtest-suite) ...), not eval-when-compile.
+
+
+=============
+How are runtime tools (eg rtest-tools, rtest-inherit, etc) made available?
+
+As extra things that can be loaded?
+
+(Chosen) As part of the package, but omittable if users want to be
+clever.  That means all their stuff must get autoloaded in Elisp.
+
+=============
+Issue: Making tests easier to write:  Could customization help?
+
+The usual form could look something like:
+
+(defcustom
+  some-foo nil
+  "Test"
+  :type 
+  (list
+    ;;Any sexp
+    (repeat
+      (choice
+	;;comparand, etc for all the clauses.
+	
+	))))
+
+It isn't clear how it would handle nestedness for map, field, every
+etc.
+
+It also would need variants for inherit, borrow, and any others we
+made.
+
+Basically, we wouldn't use the customize interface, we'd use the
+underlying widget interface.  That's a lot of work for possibly little
+payoff. 
+
+=============
+
+Handholding revisited:
+
+OK, having found better docs, using the widget library starts to seem
+feasible.
+
+What exactly would the form be?
+
+The first choice is whether to use a normal probe, inherited tests,
+etc.  
+
+Only probe does not start with the symbol rtest, but even probe can do
+that.  rtest-one-probe-0 doesn't do it perfectly, so we need a
+function in -suite that composes rtest-one-probe-0 and
+rtest-make-fail-summary, which is easy.  [Done, rtest-one-probe]
+
+So we can always begin with rtest, and later, smartly elide the first
+2 symbols if we see the function is rtest-one-probe.
+
+This demands registering the various rtest alternatives and the forms
+that support them.
+
+==
+
+rtest-one-probe starts with docstring and probe.
+
+Then it has a list of graders.  There can be any number of graders,
+but they must each be of known type.
+
+The first grader can be elided as comparand, but again we won't do
+that unless we get smart later.
+
+
+==
+
+The inherit test-form wants to choose a given function to inherit
+from, then fill in some details from its information.
+
+EG, the number and names of args to the to-call form, and its final
+call.
+
+==
+
+OK, I've basically mastered widgets now.  They are quite nice and
+easy, tho easy to nested a widget in too many quote.  The rest seems
+like it will fall out nicely.
+
+=============

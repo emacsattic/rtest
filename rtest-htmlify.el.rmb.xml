@@ -1,0 +1,50 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    All the "\n"s were changed to literal carraige returns because
+    CLISP won't present them correctly otherwise.
+
+  </General-comments>
+  <Component Name="rtest-format-list">
+    
+
+      Format strings are warmed-over C thinking and IMO have no place
+      in Common Lisp.
+
+      If we were attempting to handle positional forms, we'd recognize
+      functionp args and create a lambda form from them, which we'd
+      apply to an arglist.  It would look something like:
+
+      '(funcall 
+        (format-positional "The number is " #'number-to-string "." ) 
+        12)
+
+      Of course, we'd make short abbreviations for the usual
+      formatting operations.
+
+      There's no internal way to translate other format-types, but
+      there's no need to: we can already do it by converting the
+      object before passing.  Again, making abbreviations would be
+      helpful.
+
+      I see no reason to mix positional and named args, but they can
+      be distinguished because positional args are functionp.  It's
+      tuffer for Elisp to make that judgement, but the user can write
+      around it.
+
+      Perhaps it would be better for it, or for some variant, to
+      produce lists of strings so it need only flatten them before
+      printing.  However, that would mean it would have to distinguish
+      list objects that were to be printed as a whole.
+    
+  </Component>
+  <Component Name="rtest-htmlize-probe-failure">
+    check-type is not portable for list structures, so omitted.  EG,
+    CLISP uses typep for check-type, but doesn't define it for the
+    list structures.  
+
+    We could define typep for list structures, or we could switch to
+    non-list structures since we're now using full string returns.
+
+  </Component>
+</Rambledocs>

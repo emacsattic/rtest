@@ -1,0 +1,13 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-knownbuf-acquire-buffer">
+    Should the buffer's base name be a named constant?  No, that adds
+    nothing.  Using a named symbol is just like using a name.
+
+    Should the buffer's name begin with a space, thereby not showing
+    up in the buffer list?  No, because the user may want to examine
+    the buffer to see what happens when the test is failing.
+  </Component>
+</Rambledocs>

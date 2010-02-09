@@ -1,0 +1,10 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-parse-some-tests-in-order">
+    This actually returns 1 test at most, but we return a list of at
+    most 1 element so rtest-parse-clauses need not know about this.
+
+  </Component>
+</Rambledocs>

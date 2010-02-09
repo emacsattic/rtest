@@ -1,0 +1,48 @@
+How the files in rtest are organized.
+
+              Package structure
+
+rtest-entry.el     - Elisp entry points
+rtest-cl-entry.el  - Common Lisp entry points in Elisp
+rtest-lisp.lisp    - Common Lisp near-entry points in Common Lisp
+rtest-compat.el    - Elisp compatibility
+rtest-compat.lisp  - Common Lisp compatibility
+rtest-visible.el   - Things visible to all of rtest: structs etc.
+
+             Core processing
+
+rtest-parse        - Parse test expressions
+rtest-grade.el     - Grade tests.
+rtest-probe.el     - Do single probes.
+rtest-suite.el     - Do suites and symbols.
+rtest-error.el	   - Deal with error-management
+rtest-htmlify.el   - Turn report objects into HTML
+rtest-report.el    - Actually present reports (Elisp only)
+
+	    Pattern processing
+
+pattern-deval.el   - Build walkers
+pattern-walk.el    - Walk objects
+pattern.el         - Use walkers.  
+pattern-plus.el    - Other entry points to pattern.
+
+             Additional tools
+
+rtest-field.el     - Accessing fields of structures
+rtest-tools.el     - User tools.
+rtest-inherit.el   - Inheriting tests
+rtest-plus.el	   - Additional entry points, like assert and case.
+rtest-knownbuf.el  - Test with emacs buffers (Elisp only)
+rtest-edit.el      - Editing tests in emacs
+rtest-handhold.el  - Unfinished!  Handholding to help write tests.
+
+             Ancillary files, needed or useful but not dependent on rtest:
+
+arrange.el	   - Arrange elements in a list (ELisp only)
+encap.el	   - Encapsulate code (ELisp only)
+tehom-comint.el    - Additions to comint (ELisp only) 
+caselet.el	   - case/cond statements that bind first. 
+cl-tehom.el	   - cl enhancements (ELisp only)
+safe-equal.el	   - Version of equal that handles circularity
+local-vars.el	   - just-in-time binding of variables.
+handhold.el        - handholding creation of sexps.

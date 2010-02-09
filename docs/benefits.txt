@@ -1,0 +1,87 @@
+Benefits you get from regression testing:
+
+===============
+
+It preserves "testedness" between versions.
+
+At some point, you test your code.  At some point after that, you
+change it.  If you wrote down all the tests you used for the first
+version and they still run OK, your new version is just as fully
+tested as the old one.
+
+Of course, if you didn't write down some tests, or some testing is by
+inspection or by use, there's no way regression testing can solve that
+for you, you have to do it again.  Sometimes that can't be helped.
+
+===============
+
+It's help for debugging.
+
+Despite all your careful unit testing - just between us, really you
+cut corners, rite? - something's broken.  You can't immediately see
+what.  Into the debugger?  Crawl the source?  Not so fast.
+
+Run the relevant test suites.  If you still can't see what's broken,
+write the relevant situation - the code that should work but doesn't -
+as another test.
+
+Now you're prolly saying to yourself that one or more things "surely
+can't be the problem."  But obviously one of them is.  Did you
+actually test those conditions?  No?  Write the tests now.  The ones
+that run OK you can *really* rule out now.  The one that doesn't work
+is either the answer or a big step towards it.
+
+The worst that can happen is that you spent coding effort on the test
+suite, which you should do anyways.
+
+It bears noting that IME, in informal coding situations a lot of the
+tests actually get written as part of debugging.  That's fine, but
+don't be in such a hurry that you build bad tests, tests that break
+for unrelated reasons.
+
+===============
+
+Familiarity with the testing tools helps you write tests more easily
+
+Of course you're going to write tests at some point.  You just don't
+want it to be a lot of work.
+
+There are a lot of tools in rtest that make testing easier.  That
+doesn't just hold for regression tests, but for testing in general.
+The better you know them, the easier it is to write powerful tests.
+
+===============
+
+Certainty
+
+You've made some small change to your code.  Do you want to pore over
+the code until you are satisfied that nothing got broken, and still
+not be entirely sure nothing's broken until you've used your app
+another week and the change does or doesn't bite you?  Or would you
+rather push a button and see the message "All 53 regression tests ran
+successfully"?  
+
+===============
+
+A suite demonstrates proper usage
+
+Forgotten the proper way to call a function?  Yes, maybe you could
+have documented it better and made the interface super-obvious, but
+you didn't.  Regression tests, if you wrote them, have that
+information, rite up front in the probe expression.
+
+And they can never silently get out of sync with actual usage.  With a
+keystroke or so, you can verify that the tests still run, and
+therefore the usage is OK.
+
+===============
+
+A test suite echoes the design specs
+
+Forgotten exactly what situations a function promises to handle?  Not
+sure everything that was specified has been actually written?  A good
+regression suite will test all the major points of the spec.  If a
+situation is tested, and the test goes OK, then you know the function
+handles that.
+
+===============

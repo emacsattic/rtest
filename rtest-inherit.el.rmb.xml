@@ -1,0 +1,25 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    
+    For probe-builders, returning an error is a little bit tangled-up.
+    Somethimes we'd like to report a real error, sometimes just skip the
+    ones that won't behave.  The catcher can manage that by
+    distinguishing rtest-cant-inherit from other errors.  
+
+    And the pattern-binder, which would be useful to construct
+    inheritances, has to manage throwing back errors.  IE, we'll need
+    another relative of pattern-bind that knows when it has missed,
+    using pat-r-combine-patternforms-maybe-throw
+
+  </General-comments>
+  <Component Name="(quote rtest-suite)">
+  </Component>
+  <Component Name="rtest-make-probe-builder">
+    This can't easily combine with rtest-make-inheriting-closure, Even
+    tho all this does is get passed to rtest-make-inheriting-closure, it
+    has to be independent because the regular probe loop expects it to
+    be.
+
+  </Component>
+</Rambledocs>

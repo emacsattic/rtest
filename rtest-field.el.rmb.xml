@@ -1,0 +1,43 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+    <Node>
+      <Text-Node>
+	The dependency on rtest is very small:  We use it for our
+	error messages.
+      </Text-Node>
+    </Node>
+  </General-comments>
+  <Component Name="rtest-access-field">
+    Would be nice to handle #'car and #'cdr, and access functions in
+    general.  As long as they accept one arg, they could be used.
+    
+    Could do even more stuff, like explore properties of symbols, or
+    interpret ranges as examining the text properties of strings, but
+    we're already at the point of diminishing returns.
+    
+  </Component>
+  <Component Name="tehom-with-struct-slots">
+
+
+    Often it would be nice to capture all the slots automatically.
+    This could be signalled with a special slot-list object, say `t'.
+    But it wouldn't work portably in Common Lisp.  Each Common-Lisp
+    implementation would have to define something like (get-all-slots
+    type-name)
+    
+    We could also deduce the type argument, but not statically.  But
+    it's good for type-checking.
+    
+    If the type-name is `values', it is equivalent to
+    multiple-value-bind
+    
+    For `list', it is the same as progv and a quoted list of symbols
+    
+    Would be nice if it could handle `vector' too
+
+  </Component>
+  <Component Name="rtest-access-struct-field">
+    Doesn't support EIEIO / CLOS
+  </Component>
+</Rambledocs>

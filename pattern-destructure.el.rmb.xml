@@ -1,0 +1,69 @@
+<!DOCTYPE Rambledocs SYSTEM  "~/dtd/rambledocs-3.dtd" >
+<Rambledocs>
+  <General-comments>
+  </General-comments>
+  <Component Name="rtest-build-preassignment-form">
+    For a while thre I thaut this should use `set' because it's taking
+    symbols.  But they are in a form that gets evaluated, so `setq'
+    seems proper.
+
+  </Component>
+  <Component Name="pat-p-build-equality-tests">
+    If unique-binding-list is nil, we could just return `t'
+  </Component>
+  <Component Name="pat-r-build-equality-tests">
+    If out-binding-list is nil, we could return just `nil'
+
+  </Component>
+  <Component Name="pattern-build-walker-call">
+    object-sym is acquired as a quoted object-name in a let style, or a
+    gensym in lambda style.  In any case, it is a symbol which evaluates
+    to the object being used, either as received in a lambda parmlist or
+    as bound by a let.
+
+    We use report style as a base, and build predicate style on top of
+    it if needed.  It's inefficient but logically the same.
+    Ambitiously, we could construct a completely different set of
+    binding functions for predicate style.
+
+
+  </Component>
+  <Component Name="pattern-build-binder">
+    Can't test that the pre-assignmentsare correct  here, but
+    it's not nil.  Test that equality tests don't blow up, etc
+    
+    This test is bad because our list structure isn't named.  We
+    really need an "accessor" test in rtest.  We could use test,
+    but then it doesn't nest so nicely.  And :map-fields would be
+    helpful too, as would :map-accessors
+       
+       '( (pattern-build-binder^1 (pattern-deval 2))
+	
+	  :field
+	  (:equality-tests pattern-no-equality-tests^0)
+	  :field
+	  (:temp-symbols   nil)
+	  :field
+	  (:syms           nil)
+	  :field
+	  (:vals           nil))
+       
+  </Component>
+  <Component Name="pattern-destr-build-call-to-body">
+    pattern-destr-build-call-to-body, pattern-build-setq-call and
+    pattern-destr-build-let-binding do not take a `style' argument.
+    It is expected that the user has considered them wrt the style in
+    the first place, and `not'ing their return value would lose the
+    real value.
+
+    If grader ever treats the cdr as a list of AND tests, change it
+    here to (and ,@body)
+
+
+  </Component>
+  <Component Name="pat-r-combine-patternforms">
+    Resist the temptation to merge this with the lambda-builder that
+    uses it.  It's good to keep the functionality separate and in
+    parallel with *-predicate-style.
+  </Component>
+</Rambledocs>
